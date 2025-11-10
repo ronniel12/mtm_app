@@ -88,63 +88,55 @@
       </table>
     </div>
 
-    <!-- Mobile Table View - Fits Screen Width -->
-    <div class="mobile-table-container mobile-only">
-      <table class="mobile-trip-table">
-        <thead class="mobile-table-header">
-          <tr>
-            <th class="mobile-col-primary">Trip Info</th>
-            <th class="mobile-col-route">Route & Crew</th>
-            <th class="mobile-col-amount">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="trip in filteredTrips"
-            :key="trip.id"
-            class="mobile-trip-row"
-            @click="selectTrip(trip)"
-            :class="{ selected: selectedTrip && selectedTrip.id === trip.id }"
-          >
-            <!-- Primary Info Column -->
-            <td class="mobile-primary-cell">
-              <div class="mobile-invoice">{{ trip.invoiceNumber }}</div>
-              <div class="mobile-plate">{{ trip.truckPlate }}</div>
-              <div class="mobile-bags">{{ trip.numberOfBags || 0 }} bags</div>
-              <div class="mobile-date">{{ formatDate(trip.date) }}</div>
-            </td>
+    <!-- Mobile Card View - Compact Design -->
+    <div class="trips-mobile-cards mobile-only">
+      <div
+        v-for="trip in filteredTrips"
+        :key="trip.id"
+        class="trip-card-compact"
+        @click="selectTrip(trip)"
+        :class="{ selected: selectedTrip && selectedTrip.id === trip.id }"
+      >
+        <!-- Compact Header -->
+        <div class="card-header-compact">
+          <div class="primary-info">
+            <span class="invoice-compact">{{ trip.invoiceNumber }}</span>
+            <span class="plate-compact">{{ trip.truckPlate }}</span>
+            <span class="bags-compact">{{ trip.numberOfBags || 0 }} bags</span>
+          </div>
+          <div class="total-compact">₱{{ trip._total || 0 }}</div>
+        </div>
 
-            <!-- Route & Crew Column -->
-            <td class="mobile-route-cell">
-              <div class="mobile-route-display">
-                <span class="mobile-origin">{{ trip.origin }}</span>
-                <span class="mobile-arrow">→</span>
-                <span class="mobile-dest">{{ trip.fullDestination }}</span>
-              </div>
-              <div class="mobile-crew">
-                <span class="driver-mobile">{{ trip.driverName }}</span>
-                <span v-if="trip.helperName" class="helper-mobile">• {{ trip.helperName }}</span>
-              </div>
-            </td>
+        <!-- Route Info -->
+        <div class="route-compact">
+          <div class="route-from">{{ trip.origin }}</div>
+          <div class="route-arrow">→</div>
+          <div class="route-to">{{ trip.fullDestination }}</div>
+        </div>
 
-            <!-- Amount Column -->
-            <td class="mobile-amount-cell">
-              <div class="mobile-total">₱{{ formatCurrency(trip._total || 0) }}</div>
-              <div class="mobile-rate" :class="{ 'rate-display': trip._rateFound, 'rate-warning': !trip._rateFound }">
-                {{ trip._rate ? `₱${trip._rate}` : '--' }}
-              </div>
-              <div class="mobile-actions">
-                <button @click.stop="editTrip(trip)" class="btn-edit-mobile-table" title="Edit Trip">
-                  ✏️
-                </button>
-                <button @click.stop="deleteTrip(trip.id)" class="btn-delete-mobile-table" title="Delete Trip">
-                  🗑️
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <!-- Secondary Info -->
+        <div class="secondary-info">
+          <div class="crew-info">
+            <span class="driver-compact">{{ trip.driverName }}</span>
+            <span class="helper-compact" v-if="trip.helperName">• {{ trip.helperName }}</span>
+          </div>
+          <div class="rate-info">
+            <span class="rate-compact" :class="{ 'rate-display': trip._rateFound, 'rate-warning': !trip._rateFound }">
+              {{ trip._rate ? `₱${trip._rate}` : '--' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card-actions-compact">
+          <button @click.stop="editTrip(trip)" class="btn-edit-compact" title="Edit Trip">
+            ✏️
+          </button>
+          <button @click.stop="deleteTrip(trip.id)" class="btn-delete-compact" title="Delete Trip">
+            🗑️
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Pagination Controls -->
@@ -1372,239 +1364,6 @@ defineExpose({
   font-style: italic;
 }
 
-/* Mobile Table Styles - Fits Screen Width */
-.mobile-table-container {
-  width: 100%;
-  overflow-x: hidden; /* No horizontal scrolling */
-  margin-top: 1rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.mobile-trip-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8rem;
-  background: white;
-  border-radius: 8px;
-}
-
-.mobile-table-header th {
-  background: #f8f9fa;
-  padding: 0.75rem 0.5rem;
-  text-align: center;
-  font-weight: 600;
-  color: #333;
-  border-bottom: 2px solid #dee2e6;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.mobile-trip-row {
-  cursor: pointer;
-  transition: background-color 0.2s;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.mobile-trip-row:hover {
-  background: #f8f9fa;
-}
-
-.mobile-trip-row.selected {
-  background: #e3f2fd;
-  border-left: 3px solid #2196f3;
-}
-
-.mobile-trip-row:active {
-  background: #e1f5fe;
-}
-
-/* Column Layout - Fits Screen */
-.mobile-col-primary {
-  width: 35%;
-  text-align: left;
-}
-
-.mobile-col-route {
-  width: 45%;
-  text-align: left;
-}
-
-.mobile-col-amount {
-  width: 20%;
-  text-align: center;
-}
-
-/* Cell Content */
-.mobile-primary-cell {
-  padding: 0.875rem 0.75rem;
-  vertical-align: top;
-}
-
-.mobile-invoice {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin-bottom: 0.25rem;
-  display: block;
-}
-
-.mobile-plate {
-  font-size: 0.8rem;
-  color: #64748b;
-  font-weight: 500;
-  margin-bottom: 0.125rem;
-  display: block;
-}
-
-.mobile-bags {
-  font-size: 0.75rem;
-  color: #94a3b8;
-  font-weight: 400;
-  display: block;
-}
-
-.mobile-date {
-  font-size: 0.7rem;
-  color: #9ca3af;
-  margin-top: 0.25rem;
-  display: block;
-}
-
-.mobile-route-cell {
-  padding: 0.875rem 0.75rem;
-  vertical-align: top;
-}
-
-.mobile-route-display {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-}
-
-.mobile-origin, .mobile-dest {
-  font-size: 0.8rem;
-  color: #475569;
-  font-weight: 500;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mobile-origin {
-  text-align: left;
-}
-
-.mobile-dest {
-  text-align: right;
-}
-
-.mobile-arrow {
-  font-size: 0.9rem;
-  color: #64748b;
-  font-weight: 600;
-  margin: 0 0.375rem;
-  flex-shrink: 0;
-}
-
-.mobile-crew {
-  font-size: 0.75rem;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.driver-mobile {
-  color: #1e293b;
-}
-
-.helper-mobile {
-  color: #64748b;
-}
-
-.mobile-amount-cell {
-  padding: 0.875rem 0.5rem;
-  vertical-align: top;
-  text-align: center;
-}
-
-.mobile-total {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #059669;
-  margin-bottom: 0.25rem;
-  display: block;
-}
-
-.mobile-rate {
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  display: inline-block;
-  margin-bottom: 0.5rem;
-}
-
-.mobile-rate.rate-display {
-  color: #059669;
-  background: #ecfdf5;
-  border-color: #a7f3d0;
-}
-
-.mobile-rate.rate-warning {
-  color: #dc2626;
-  background: #fef2f2;
-  border-color: #fecaca;
-}
-
-.mobile-actions {
-  display: flex;
-  gap: 0.25rem;
-  justify-content: center;
-  margin-top: 0.5rem;
-}
-
-.btn-edit-mobile-table, .btn-delete-mobile-table {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.btn-edit-mobile-table {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.btn-edit-mobile-table:hover {
-  background: #fde68a;
-  transform: scale(1.05);
-}
-
-.btn-delete-mobile-table {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.btn-delete-mobile-table:hover {
-  background: #fecaca;
-  transform: scale(1.05);
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
   .desktop-only {
@@ -1633,57 +1392,6 @@ defineExpose({
 
   .pagination-controls {
     justify-content: center;
-  }
-
-  /* Mobile table specific adjustments */
-  .mobile-col-primary {
-    width: 35%;
-  }
-
-  .mobile-col-route {
-    width: 45%;
-  }
-
-  .mobile-col-amount {
-    width: 20%;
-  }
-}
-
-@media (max-width: 480px) {
-  /* Extra small screens */
-  .mobile-col-primary {
-    width: 40%;
-  }
-
-  .mobile-col-route {
-    width: 40%;
-  }
-
-  .mobile-col-amount {
-    width: 20%;
-  }
-
-  .mobile-route-display {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.125rem;
-  }
-
-  .mobile-origin, .mobile-dest {
-    text-align: left;
-    width: 100%;
-  }
-
-  .mobile-arrow {
-    display: none; /* Hide arrow on very small screens */
-  }
-
-  .mobile-invoice {
-    font-size: 0.9rem;
-  }
-
-  .mobile-total {
-    font-size: 0.9rem;
   }
 }
 
