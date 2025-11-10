@@ -503,18 +503,15 @@ app.get('/api/trips/:id', async (req, res) => {
 });
 
 // Continue copying all other routes from your original server.js
-app.post('/api/trips', async (req, res) => {
+app.post('/api/trips', jsonParser, async (req, res) => {
   try {
-    // Parse JSON body manually to avoid middleware conflicts
-    let body;
-    try {
-      body = JSON.parse(req.body);
-    } catch (parseError) {
-      // If req.body is already parsed, use it directly
-      body = req.body;
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
     }
-
-
 
     // Use current UTC time - PostgreSQL will handle timezone conversion
     const finalTimestamp = new Date().toISOString();
