@@ -14,40 +14,37 @@
         </div>
       </div>
 
-      <!-- Enhanced Stats Grid - Responsive -->
-      <div class="stats-grid" :class="{ 'mobile-scroll': isMobile }">
-        <!-- Priority Stats - Always Visible -->
-        <div class="stat-card priority-stat">
+      <!-- Enhanced Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
           <div class="stat-icon">🚛</div>
           <div class="stat-info">
             <div class="stat-value">{{ filteredTrips.length }}</div>
             <div class="stat-label">Total Trips</div>
           </div>
         </div>
-        <div class="stat-card priority-stat">
+        <div class="stat-card">
           <div class="stat-icon">👥</div>
           <div class="stat-info">
             <div class="stat-value">{{ activeEmployees }}</div>
             <div class="stat-label">Active Employees</div>
           </div>
         </div>
-        <div class="stat-card profit-card priority-stat">
-          <div class="stat-icon">💰</div>
-          <div class="stat-info">
-            <div class="stat-value">₱{{ formatCurrency(filteredRevenue) }}</div>
-            <div class="stat-label">{{ revenueLabel }}</div>
-          </div>
-        </div>
-
-        <!-- Secondary Stats - Hidden on Mobile -->
-        <div v-if="!isMobile" class="stat-card">
+        <div class="stat-card">
           <div class="stat-icon">✅</div>
           <div class="stat-info">
             <div class="stat-value">{{ completedTrips }}</div>
             <div class="stat-label">Completed</div>
           </div>
         </div>
-        <div v-if="!isMobile" class="stat-card">
+        <div class="stat-card profit-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-info">
+            <div class="stat-value">₱{{ formatCurrency(filteredRevenue) }}</div>
+            <div class="stat-label">{{ revenueLabel }}</div>
+          </div>
+        </div>
+        <div class="stat-card">
           <div class="stat-icon">📦</div>
           <div class="stat-info">
             <div class="stat-value">{{ filteredBags }}</div>
@@ -56,50 +53,39 @@
         </div>
       </div>
 
-      <!-- Charts Section - Responsive -->
-      <div class="charts-section" :class="{ 'mobile-priority': isMobile }">
-        <!-- Priority Charts - Always Visible -->
-        <div class="chart-card priority-chart">
-          <h3>💰 Monthly Revenue</h3>
-          <div class="chart-container" :class="{ 'mobile-chart': isMobile }">
-            <Line :data="revenueData" :options="isMobile ? mobileChartOptions : revenueOptions" />
-          </div>
-        </div>
-
-        <div class="chart-card priority-chart">
-          <h3>🗺️ Top Destinations</h3>
-          <div class="chart-container" :class="{ 'mobile-chart': isMobile }">
-            <Bar :data="destinationData" :options="isMobile ? mobileChartOptions : barOptions" />
-          </div>
-        </div>
-
-        <!-- Secondary Charts - Desktop Only or Expandable -->
-        <div v-if="!isMobile || showAllCharts" class="chart-card">
+      <!-- Charts Section -->
+      <div class="charts-section">
+        <!-- Monthly Trips Chart -->
+        <div class="chart-card">
           <h3>📈 Monthly Trip Performance</h3>
-          <div class="chart-container" :class="{ 'mobile-chart': isMobile }">
-            <Line :data="monthlyTripsData" :options="isMobile ? mobileChartOptions : lineOptions" />
+          <div class="chart-container">
+            <Line :data="monthlyTripsData" :options="lineOptions" />
           </div>
         </div>
 
-        <div v-if="!isMobile || showAllCharts" class="chart-card">
+        <!-- Destination Distribution -->
+        <div class="chart-card">
+          <h3>🗺️ Top Destinations</h3>
+          <div class="chart-container">
+            <Bar :data="destinationData" :options="barOptions" />
+          </div>
+        </div>
+
+        <!-- Revenue Chart -->
+        <div class="chart-card">
+          <h3>💰 Monthly Revenue</h3>
+          <div class="chart-container">
+            <Line :data="revenueData" :options="revenueOptions" />
+          </div>
+        </div>
+
+        <!-- Truck Performance -->
+        <div class="chart-card">
           <h3>🚚 Truck Performance</h3>
-          <div class="chart-container" :class="{ 'mobile-chart': isMobile }">
-            <Doughnut :data="truckPerformanceData" :options="isMobile ? mobileDoughnutOptions : doughnutOptions" />
+          <div class="chart-container">
+            <Doughnut :data="truckPerformanceData" :options="doughnutOptions" />
           </div>
         </div>
-      </div>
-
-      <!-- Mobile Expand Button -->
-      <div v-if="isMobile && !showAllCharts" class="expand-section">
-        <button @click="showAllCharts = true" class="expand-btn">
-          📊 Show Detailed Charts
-        </button>
-      </div>
-
-      <div v-if="isMobile && showAllCharts" class="expand-section">
-        <button @click="showAllCharts = false" class="expand-btn collapse">
-          📉 Show Less
-        </button>
       </div>
 
       <!-- Recent Trips -->
@@ -160,15 +146,6 @@ ChartJS.register(
 
 // Filter state
 const filterPeriod = ref('all')
-const showAllCharts = ref(false)
-
-// Mobile detection
-const isMobile = computed(() => {
-  if (typeof window !== 'undefined') {
-    return window.innerWidth <= 768
-  }
-  return false
-})
 
 const props = defineProps({
   trips: {
@@ -457,35 +434,6 @@ const doughnutOptions = {
     }
   }
 }
-
-// Mobile-specific chart options
-const mobileChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false
-    }
-  },
-  scales: {
-    x: {
-      display: false
-    },
-    y: {
-      display: false
-    }
-  }
-}
-
-const mobileDoughnutOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      display: false
-    }
-  }
-}
 </script>
 
 <style scoped>
@@ -686,77 +634,6 @@ const mobileDoughnutOptions = {
   border-color: #667eea;
 }
 
-/* Mobile Scroll Stats */
-.mobile-scroll {
-  display: flex !important;
-  overflow-x: auto;
-  grid-template-columns: none !important;
-  gap: 0.75rem;
-  padding: 0.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.mobile-scroll .stat-card {
-  flex: 0 0 140px;
-  min-width: 140px;
-  padding: 1rem;
-}
-
-.mobile-scroll .stat-value {
-  font-size: 1.5rem;
-}
-
-.mobile-scroll .stat-icon {
-  font-size: 1.5rem;
-  margin-bottom: 0.25rem;
-}
-
-/* Mobile Priority Charts */
-.mobile-priority {
-  grid-template-columns: 1fr !important;
-  gap: 1rem !important;
-}
-
-.mobile-chart {
-  height: 200px !important;
-}
-
-/* Expand Section */
-.expand-section {
-  text-align: center;
-  margin: 1.5rem 0;
-}
-
-.expand-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 0.875rem 2rem;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.expand-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-}
-
-.expand-btn.collapse {
-  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
-  box-shadow: 0 2px 10px rgba(107, 114, 128, 0.3);
-}
-
-.expand-btn.collapse:hover {
-  box-shadow: 0 4px 15px rgba(107, 114, 128, 0.4);
-}
-
 @media (max-width: 768px) {
   .filters-section {
     flex-direction: column;
@@ -788,45 +665,6 @@ const mobileDoughnutOptions = {
 
   .trip-date {
     align-self: flex-end;
-  }
-
-  /* Mobile-specific adjustments */
-  .priority-stat {
-    flex: 0 0 140px;
-    min-width: 140px;
-  }
-
-  .chart-card h3 {
-    font-size: 1rem;
-  }
-
-  .recent-trips {
-    padding: 1rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .mobile-scroll .stat-card {
-    flex: 0 0 120px;
-    min-width: 120px;
-    padding: 0.75rem;
-  }
-
-  .mobile-scroll .stat-value {
-    font-size: 1.25rem;
-  }
-
-  .mobile-scroll .stat-icon {
-    font-size: 1.25rem;
-  }
-
-  .mobile-chart {
-    height: 180px !important;
-  }
-
-  .expand-btn {
-    padding: 0.75rem 1.5rem;
-    font-size: 0.9rem;
   }
 }
 </style>
