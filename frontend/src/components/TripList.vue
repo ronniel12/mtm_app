@@ -457,6 +457,13 @@ const formatDate = (dateString) => {
   })
 }
 
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('en-PH', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount)
+}
+
 const getEmployeeNameByUuid = (uuid) => {
   if (!uuid) return 'Not assigned'
   const employee = employees.value.find(emp => emp.uuid === uuid)
