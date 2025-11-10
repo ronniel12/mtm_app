@@ -18,7 +18,8 @@
       No trips found
     </div>
 
-    <div v-else class="trips-table-container">
+    <!-- Desktop Table View -->
+    <div v-else class="trips-table-container desktop-only">
       <table class="trips-table">
         <thead>
           <tr>
@@ -85,6 +86,83 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Mobile Card View -->
+    <div class="trips-mobile-cards mobile-only">
+      <div
+        v-for="trip in filteredTrips"
+        :key="trip.id"
+        class="trip-card"
+        @click="selectTrip(trip)"
+        :class="{ selected: selectedTrip && selectedTrip.id === trip.id }"
+      >
+        <div class="card-header">
+          <div class="card-title">
+            <span class="invoice-number">{{ trip.invoiceNumber }}</span>
+            <span class="date">{{ formatDate(trip.date) }}</span>
+          </div>
+          <div class="card-actions">
+            <button @click.stop="editTrip(trip)" class="btn-edit-mobile" title="Edit Trip">
+              ✏️
+            </button>
+            <button @click.stop="deleteTrip(trip.id)" class="btn-delete-mobile" title="Delete Trip">
+              🗑️
+            </button>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="card-row">
+            <div class="card-field">
+              <span class="field-label">Plate #:</span>
+              <span class="field-value">{{ trip.truckPlate }}</span>
+            </div>
+            <div class="card-field">
+              <span class="field-label">Bags:</span>
+              <span class="field-value">{{ trip.numberOfBags || 0 }}</span>
+            </div>
+          </div>
+
+          <div class="card-row">
+            <div class="card-field full-width">
+              <span class="field-label">Origin:</span>
+              <span class="field-value">{{ trip.origin }}</span>
+            </div>
+          </div>
+
+          <div class="card-row">
+            <div class="card-field full-width">
+              <span class="field-label">Destination:</span>
+              <span class="field-value">{{ trip.fullDestination }}</span>
+            </div>
+          </div>
+
+          <div class="card-row">
+            <div class="card-field">
+              <span class="field-label">Driver:</span>
+              <span class="field-value">{{ trip.driverName }}</span>
+            </div>
+            <div class="card-field">
+              <span class="field-label">Helper:</span>
+              <span class="field-value">{{ trip.helperName }}</span>
+            </div>
+          </div>
+
+          <div class="card-row">
+            <div class="card-field">
+              <span class="field-label">Rate:</span>
+              <span class="field-value" :class="{ 'rate-display': trip._rateFound, 'rate-warning': !trip._rateFound }">
+                {{ trip._rate ? `₱${trip._rate}` : trip._rateStatus || '--' }}
+              </span>
+            </div>
+            <div class="card-field">
+              <span class="field-label">Total:</span>
+              <span class="field-value total-amount">₱{{ trip._total || 0 }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Pagination Controls -->
@@ -955,5 +1033,195 @@ defineExpose({
   background: #007bff;
   color: white;
   border-color: #007bff;
+}
+
+/* Mobile Card Styles */
+.trips-mobile-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.trip-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+}
+
+.trip-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.trip-card.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.invoice-number {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.date {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-edit-mobile, .btn-delete-mobile {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: all 0.2s ease;
+}
+
+.btn-edit-mobile {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.btn-edit-mobile:hover {
+  background: #fde68a;
+  transform: scale(1.05);
+}
+
+.btn-delete-mobile {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.btn-delete-mobile:hover {
+  background: #fecaca;
+  transform: scale(1.05);
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+.card-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.card-row:last-child {
+  margin-bottom: 0;
+}
+
+.card-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.card-field.full-width {
+  flex: 1 1 100%;
+}
+
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.field-value {
+  font-size: 0.9rem;
+  color: #1e293b;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.field-value.total-amount {
+  color: #059669;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.field-value.rate-display {
+  color: #059669;
+  font-weight: 600;
+}
+
+.field-value.rate-warning {
+  color: #dc2626;
+  font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none;
+  }
+
+  .mobile-only {
+    display: block;
+  }
+
+  .list-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .filters {
+    align-self: flex-start;
+  }
+
+  .pagination-container {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .pagination-controls {
+    justify-content: center;
+  }
+}
+
+@media (min-width: 769px) {
+  .desktop-only {
+    display: block;
+  }
+
+  .mobile-only {
+    display: none;
+  }
 }
 </style>

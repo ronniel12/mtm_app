@@ -19,6 +19,7 @@ const activeSection = ref('dashboard')
 const refreshKey = ref(0)
 const editTrip = ref(null)
 const showHistory = ref(false)
+const mobileMenuOpen = ref(false)
 
 const trips = ref([])
 const employees = ref([])
@@ -86,6 +87,23 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString()
 }
 
+// Mobile menu functions
+const toggleMobileMenu = () => {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+const closeMobileMenu = () => {
+  mobileMenuOpen.value = false
+}
+
+const setActiveSectionMobile = (section) => {
+  activeSection.value = section
+  showForm.value = false
+  editTrip.value = null
+  showHistory.value = false
+  mobileMenuOpen.value = false // Close mobile menu after selection
+}
+
 fetchDashboardData()
 </script>
 
@@ -97,6 +115,7 @@ fetchDashboardData()
           <img src="/mtmlogo.jpeg" alt="MTM Enterprise Logo" class="logo-image" />
           <h1>MTM Enterprise</h1>
         </div>
+        <!-- Desktop Navigation -->
         <nav class="top-nav">
           <button
             :class="{ active: activeSection === 'dashboard' }"
@@ -162,6 +181,91 @@ fetchDashboardData()
             ⚙️ Settings
           </button>
         </nav>
+
+        <!-- Mobile Menu Button -->
+        <button @click="toggleMobileMenu" class="mobile-menu-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+
+        <!-- Mobile Menu Overlay -->
+        <div :class="{ active: mobileMenuOpen }" class="mobile-menu-overlay" @click="closeMobileMenu">
+          <div class="mobile-menu" @click.stop>
+            <div class="mobile-menu-header">
+              <h3 class="mobile-menu-title">MTM Enterprise</h3>
+              <button @click="closeMobileMenu" class="mobile-menu-close">&times;</button>
+            </div>
+
+            <nav class="mobile-nav-list">
+              <button
+                :class="{ active: activeSection === 'dashboard' }"
+                @click="setActiveSectionMobile('dashboard')"
+                class="mobile-nav-btn"
+              >
+                📊 Dashboard
+              </button>
+              <button
+                :class="{ active: activeSection === 'payroll' }"
+                @click="setActiveSectionMobile('payroll')"
+                class="mobile-nav-btn"
+              >
+                💰 Payroll
+              </button>
+              <button
+                :class="{ active: activeSection === 'trips' }"
+                @click="setActiveSectionMobile('trips')"
+                class="mobile-nav-btn"
+              >
+                🚛 Trips
+              </button>
+              <button
+                :class="{ active: activeSection === 'billing' }"
+                @click="setActiveSectionMobile('billing')"
+                class="mobile-nav-btn"
+              >
+                🧾 Billing
+              </button>
+              <button
+                :class="{ active: activeSection === 'tolls' }"
+                @click="setActiveSectionMobile('tolls')"
+                class="mobile-nav-btn"
+              >
+                🛤️ Tolls
+              </button>
+              <button
+                :class="{ active: activeSection === 'fuel' }"
+                @click="setActiveSectionMobile('fuel')"
+                class="mobile-nav-btn"
+              >
+                ⛽ Fuel
+              </button>
+              <button
+                :class="{ active: activeSection === 'expenses' }"
+                @click="setActiveSectionMobile('expenses')"
+                class="mobile-nav-btn"
+              >
+                💸 Expenses
+              </button>
+              <button
+                :class="{ active: activeSection === 'maintenance' }"
+                @click="setActiveSectionMobile('maintenance')"
+                class="mobile-nav-btn"
+              >
+                🔧 Maintenance
+              </button>
+              <button
+                :class="{ active: activeSection === 'settings' }"
+                @click="setActiveSectionMobile('settings')"
+                class="mobile-nav-btn"
+              >
+                ⚙️ Settings
+              </button>
+            </nav>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -334,13 +438,14 @@ fetchDashboardData()
   left: 0;
   right: 0;
   z-index: 1000;
-  height: 45px;
+  background: #1e40af;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .header-content {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0.5rem 2rem;
+  padding: 0.5rem 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -351,50 +456,179 @@ fetchDashboardData()
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  z-index: 1001;
 }
 
 .logo-image {
-  height: 20px;
+  height: 24px;
   width: auto;
   object-fit: contain;
 }
 
 .logo h1 {
   margin: 0;
-  color: #1f2937;
+  color: white;
   font-size: 1.2rem;
-  font-weight: 300;
+  font-weight: 600;
 }
 
 .top-nav {
   display: flex;
-  justify-content: space-between;
-  flex: 1;
-  margin-left: 2rem;
+  gap: 0.25rem;
+  align-items: center;
 }
 
 .nav-btn {
-  background: #1e40af;
+  background: rgba(255, 255, 255, 0.1);
   color: white;
-  border: none;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
   white-space: nowrap;
-  flex: 1;
+  min-width: 60px;
   text-align: center;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
 }
 
 .nav-btn:hover {
-  background: #1e3a8a;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .nav-btn.active {
-  background: #1e293b;
-  border-bottom: 2px solid #0f172a;
+  background: white;
+  color: #1e40af;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Mobile Menu Button */
+.mobile-menu-btn {
+  display: none;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.mobile-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mobile-menu-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Mobile Menu Overlay */
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.mobile-menu-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  right: -300px;
+  width: 280px;
+  height: 100vh;
+  background: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  transition: right 0.3s ease;
+  padding: 2rem 1.5rem;
+}
+
+.mobile-menu.active {
+  right: 0;
+}
+
+.mobile-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.mobile-menu-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.mobile-menu-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.mobile-menu-close:hover {
+  background: #f3f4f6;
+}
+
+.mobile-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mobile-nav-btn {
+  width: 100%;
+  background: #f8fafc;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mobile-nav-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateX(4px);
+}
+
+.mobile-nav-btn.active {
+  background: #1e40af;
+  color: white;
+  border-color: #1e40af;
+  font-weight: 600;
 }
 
 .btn-primary {
@@ -636,5 +870,105 @@ fetchDashboardData()
   margin: 0 0 1.5rem 0;
   font-size: 1.1rem;
   line-height: 1.6;
+}
+
+/* Responsive Design - Mobile First */
+@media (max-width: 768px) {
+  .header-content {
+    padding: 0.5rem;
+  }
+
+  .logo h1 {
+    font-size: 1rem;
+  }
+
+  .logo-image {
+    height: 20px;
+  }
+
+  /* Hide desktop navigation on mobile */
+  .top-nav {
+    display: none;
+  }
+
+  /* Show mobile menu button on mobile */
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Adjust main content padding for mobile */
+  .main-content {
+    padding: 60px 1rem 2rem 1rem;
+  }
+
+  /* Make billing navigation stack on mobile */
+  .billing-nav {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .billing-nav-btn {
+    padding: 1rem;
+    font-size: 0.9rem;
+  }
+
+  /* Adjust section padding for mobile */
+  .section {
+    padding: 1rem;
+  }
+
+  .dashboard, .form-container {
+    padding: 1rem;
+  }
+
+  /* Make modal content full width on mobile */
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-content {
+    padding: 0.25rem;
+  }
+
+  .logo {
+    gap: 0.5rem;
+  }
+
+  .logo h1 {
+    font-size: 0.9rem;
+  }
+
+  .mobile-menu {
+    width: 100%;
+    padding: 1.5rem 1rem;
+  }
+
+  .mobile-nav-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .main-content {
+    padding: 55px 0.5rem 2rem 0.5rem;
+  }
+
+  .section {
+    padding: 0.5rem;
+  }
+
+  .dashboard, .form-container {
+    padding: 0.75rem;
+  }
+
+  .modal-content {
+    width: 98%;
+    padding: 0.75rem;
+  }
 }
 </style>
