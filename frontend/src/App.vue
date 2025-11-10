@@ -108,168 +108,231 @@ fetchDashboardData()
 </script>
 
 <template>
-  <div class="app">
-    <header class="top-header">
-      <div class="header-content">
-        <div class="logo">
-          <img src="/mtmlogo.jpeg" alt="MTM Enterprise Logo" class="logo-image" />
-          <h1>MTM Enterprise</h1>
-        </div>
-        <!-- Desktop Navigation -->
-        <nav class="top-nav">
-          <button
-            :class="{ active: activeSection === 'dashboard' }"
-            @click="setActiveSection('dashboard')"
-            class="nav-btn"
-          >
-            📊 Dashboard
-          </button>
-          <button
-            :class="{ active: activeSection === 'payroll' }"
-            @click="setActiveSection('payroll')"
-            class="nav-btn"
-          >
-            💰 Payroll
-          </button>
-          <button
-            :class="{ active: activeSection === 'trips' }"
-            @click="setActiveSection('trips')"
-            class="nav-btn"
-          >
-            🚛 Trips
-          </button>
-          <button
-            :class="{ active: activeSection === 'billing' }"
-            @click="setActiveSection('billing')"
-            class="nav-btn"
-          >
-            🧾 Billing
-          </button>
-          <button
-            :class="{ active: activeSection === 'tolls' }"
-            @click="setActiveSection('tolls')"
-            class="nav-btn"
-          >
-            🛤️ Tolls
-          </button>
-          <button
-            :class="{ active: activeSection === 'fuel' }"
-            @click="setActiveSection('fuel')"
-            class="nav-btn"
-          >
-            ⛽ Fuel
-          </button>
-          <button
-            :class="{ active: activeSection === 'expenses' }"
-            @click="setActiveSection('expenses')"
-            class="nav-btn"
-          >
-            💸 Expenses
-          </button>
-          <button
-            :class="{ active: activeSection === 'maintenance' }"
-            @click="setActiveSection('maintenance')"
-            class="nav-btn"
-          >
-            🔧 Maintenance
-          </button>
-          <button
-            :class="{ active: activeSection === 'settings' }"
-            @click="setActiveSection('settings')"
-            class="nav-btn"
-          >
-            ⚙️ Settings
-          </button>
-        </nav>
+  <v-app>
+    <!-- Vuetify App Bar -->
+    <v-app-bar
+      app
+      color="primary"
+      dark
+      elevation="2"
+      height="64"
+    >
+      <v-app-bar-nav-icon @click="mobileMenuOpen = !mobileMenuOpen" class="d-md-none" />
+      <v-toolbar-title class="d-flex align-center">
+        <v-img
+          src="/mtmlogo.jpeg"
+          alt="MTM Enterprise Logo"
+          max-height="32"
+          max-width="32"
+          class="me-3"
+        />
+        <span class="text-h6 font-weight-bold">MTM Enterprise</span>
+      </v-toolbar-title>
 
-        <!-- Mobile Menu Button -->
-        <button @click="toggleMobileMenu" class="mobile-menu-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="3" y1="12" x2="21" y2="12"/>
-            <line x1="3" y1="6" x2="21" y2="6"/>
-            <line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
-        </button>
+      <!-- Desktop Navigation -->
+      <v-spacer />
+      <v-tabs
+        v-model="activeSection"
+        class="d-none d-md-flex"
+        bg-color="transparent"
+        slider-color="white"
+        hide-slider
+      >
+        <v-tab
+          value="dashboard"
+          @click="setActiveSection('dashboard')"
+          class="nav-tab"
+        >
+          <v-icon start size="18">mdi-view-dashboard</v-icon>
+          Dashboard
+        </v-tab>
+        <v-tab
+          value="payroll"
+          @click="setActiveSection('payroll')"
+          class="nav-tab"
+        >
+          <v-icon start size="18">mdi-cash-multiple</v-icon>
+          Payroll
+        </v-tab>
+        <v-tab
+          value="trips"
+          @click="setActiveSection('trips')"
+          class="nav-tab"
+        >
+          <v-icon start size="18">mdi-truck</v-icon>
+          Trips
+        </v-tab>
+        <v-tab
+          value="billing"
+          @click="setActiveSection('billing')"
+          class="nav-tab"
+        >
+          <v-icon start size="18">mdi-receipt</v-icon>
+          Billing
+        </v-tab>
+        <v-tab
+          value="tolls"
+          @click="setActiveSection('tolls')"
+          class="nav-tab"
+        >
+          <v-icon start size="18">mdi-road-variant</v-icon>
+          Tolls
+        </v-tab>
+        <v-tab
+          value="fuel"
+          @click="setActiveSection('fuel')"
+          class="nav-tab"
+        >
+          <v-icon start size="18">mdi-gas-station</v-icon>
+          Fuel
+        </v-tab>
+        <v-tab
+          value="expenses"
+          @click="setActiveSection('expenses')"
+          class="nav-tab"
+        >
+          <v-icon start size="18">mdi-cash-minus</v-icon>
+          Expenses
+        </v-tab>
+        <v-tab
+          value="maintenance"
+          @click="setActiveSection('maintenance')"
+          class="nav-tab"
+        >
+          <v-icon start size="18">mdi-wrench</v-icon>
+          Maintenance
+        </v-tab>
+        <v-tab
+          value="settings"
+          @click="setActiveSection('settings')"
+          class="nav-tab"
+        >
+          <v-icon start size="18">mdi-cog</v-icon>
+          Settings
+        </v-tab>
+      </v-tabs>
+    </v-app-bar>
 
-        <!-- Mobile Menu Overlay -->
-        <div :class="{ active: mobileMenuOpen }" class="mobile-menu-overlay" @click="closeMobileMenu">
-          <div class="mobile-menu" @click.stop>
-            <div class="mobile-menu-header">
-              <h3 class="mobile-menu-title">MTM Enterprise</h3>
-              <button @click="closeMobileMenu" class="mobile-menu-close">&times;</button>
-            </div>
+    <!-- Vuetify Navigation Drawer -->
+    <v-navigation-drawer
+      v-model="mobileMenuOpen"
+      temporary
+      location="left"
+      width="280"
+    >
+      <v-list nav>
+        <v-list-item>
+          <v-list-item-title class="text-h6 font-weight-bold">
+            MTM Enterprise
+          </v-list-item-title>
+        </v-list-item>
 
-            <nav class="mobile-nav-list">
-              <button
-                :class="{ active: activeSection === 'dashboard' }"
-                @click="setActiveSectionMobile('dashboard')"
-                class="mobile-nav-btn"
-              >
-                📊 Dashboard
-              </button>
-              <button
-                :class="{ active: activeSection === 'payroll' }"
-                @click="setActiveSectionMobile('payroll')"
-                class="mobile-nav-btn"
-              >
-                💰 Payroll
-              </button>
-              <button
-                :class="{ active: activeSection === 'trips' }"
-                @click="setActiveSectionMobile('trips')"
-                class="mobile-nav-btn"
-              >
-                🚛 Trips
-              </button>
-              <button
-                :class="{ active: activeSection === 'billing' }"
-                @click="setActiveSectionMobile('billing')"
-                class="mobile-nav-btn"
-              >
-                🧾 Billing
-              </button>
-              <button
-                :class="{ active: activeSection === 'tolls' }"
-                @click="setActiveSectionMobile('tolls')"
-                class="mobile-nav-btn"
-              >
-                🛤️ Tolls
-              </button>
-              <button
-                :class="{ active: activeSection === 'fuel' }"
-                @click="setActiveSectionMobile('fuel')"
-                class="mobile-nav-btn"
-              >
-                ⛽ Fuel
-              </button>
-              <button
-                :class="{ active: activeSection === 'expenses' }"
-                @click="setActiveSectionMobile('expenses')"
-                class="mobile-nav-btn"
-              >
-                💸 Expenses
-              </button>
-              <button
-                :class="{ active: activeSection === 'maintenance' }"
-                @click="setActiveSectionMobile('maintenance')"
-                class="mobile-nav-btn"
-              >
-                🔧 Maintenance
-              </button>
-              <button
-                :class="{ active: activeSection === 'settings' }"
-                @click="setActiveSectionMobile('settings')"
-                class="mobile-nav-btn"
-              >
-                ⚙️ Settings
-              </button>
-            </nav>
-          </div>
-        </div>
-      </div>
-    </header>
+        <v-divider class="my-2" />
 
-    <main class="main-content">
+        <v-list-item
+          :active="activeSection === 'dashboard'"
+          @click="setActiveSectionMobile('dashboard')"
+          value="dashboard"
+        >
+          <template #prepend>
+            <v-icon>mdi-view-dashboard</v-icon>
+          </template>
+          <v-list-item-title>Dashboard</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          :active="activeSection === 'payroll'"
+          @click="setActiveSectionMobile('payroll')"
+          value="payroll"
+        >
+          <template #prepend>
+            <v-icon>mdi-cash-multiple</v-icon>
+          </template>
+          <v-list-item-title>Payroll</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          :active="activeSection === 'trips'"
+          @click="setActiveSectionMobile('trips')"
+          value="trips"
+        >
+          <template #prepend>
+            <v-icon>mdi-truck</v-icon>
+          </template>
+          <v-list-item-title>Trips</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          :active="activeSection === 'billing'"
+          @click="setActiveSectionMobile('billing')"
+          value="billing"
+        >
+          <template #prepend>
+            <v-icon>mdi-receipt</v-icon>
+          </template>
+          <v-list-item-title>Billing</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          :active="activeSection === 'tolls'"
+          @click="setActiveSectionMobile('tolls')"
+          value="tolls"
+        >
+          <template #prepend>
+            <v-icon>mdi-road-variant</v-icon>
+          </template>
+          <v-list-item-title>Tolls</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          :active="activeSection === 'fuel'"
+          @click="setActiveSectionMobile('fuel')"
+          value="fuel"
+        >
+          <template #prepend>
+            <v-icon>mdi-gas-station</v-icon>
+          </template>
+          <v-list-item-title>Fuel</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          :active="activeSection === 'expenses'"
+          @click="setActiveSectionMobile('expenses')"
+          value="expenses"
+        >
+          <template #prepend>
+            <v-icon>mdi-cash-minus</v-icon>
+          </template>
+          <v-list-item-title>Expenses</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          :active="activeSection === 'maintenance'"
+          @click="setActiveSectionMobile('maintenance')"
+          value="maintenance"
+        >
+          <template #prepend>
+            <v-icon>mdi-wrench</v-icon>
+          </template>
+          <v-list-item-title>Maintenance</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          :active="activeSection === 'settings'"
+          @click="setActiveSectionMobile('settings')"
+          value="settings"
+        >
+          <template #prepend>
+            <v-icon>mdi-cog</v-icon>
+          </template>
+          <v-list-item-title>Settings</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-navigation-drawer>
+
+    <!-- Main Content -->
+    <v-main class="bg-grey-lighten-4">
+      <v-container fluid class="pa-4 pa-md-6">
       <!-- Dashboard Section -->
       <div v-if="activeSection === 'dashboard'" class="section dashboard">
         <div class="section-header">
@@ -422,8 +485,9 @@ fetchDashboardData()
           <PayslipHistory @switch-to-create="showHistory = false" />
         </div>
       </div>
-    </main>
-  </div>
+      </v-container>
+    </v-main>
+  </v-app>
 </template>
 
 <style scoped>
