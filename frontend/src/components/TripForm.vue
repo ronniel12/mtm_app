@@ -293,8 +293,10 @@ const submitForm = async () => {
 
     if (isEditing.value && props.editTrip) {
       await axios.put(`${API_BASE_URL}/trips/${props.editTrip.id}`, data)
+      alert('Trip updated successfully!')
     } else {
       await axios.post(`${API_BASE_URL}/trips`, data)
+      alert('Trip added successfully!')
     }
 
     emit('tripAdded')

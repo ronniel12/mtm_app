@@ -556,6 +556,9 @@ app.post('/api/trips', jsonParser, async (req, res) => {
       finalTimestamp  // updated_at
     ]);
 
+    // Clear relevant caches when new trip is created
+    cache.del('trips:count');
+
     console.log('Creating new trip:', newTrip.tracking_number);
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -564,19 +567,27 @@ app.post('/api/trips', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/api/trips/:id', async (req, res) => {
+app.put('/api/trips/:id', jsonParser, async (req, res) => {
   try {
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
     const updateFields = [];
     const values = [];
     let paramCount = 1;
 
     // Build dynamic update query
-    Object.keys(req.body).forEach(key => {
-      if (req.body[key] !== undefined) {
+    Object.keys(body).forEach(key => {
+      if (body[key] !== undefined) {
         // Convert camelCase to snake_case for database columns
         const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
         updateFields.push(`${dbKey} = $${paramCount}`);
-        values.push(req.body[key]);
+        values.push(body[key]);
         paramCount++;
       }
     });
@@ -597,6 +608,9 @@ app.put('/api/trips/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Trip not found' });
     }
+
+    // Clear relevant caches when trip is updated
+    cache.del('trips:count');
 
     // Transform database format to frontend expected format (snake_case to camelCase)
     const trip = result.rows[0];
@@ -807,8 +821,16 @@ app.post('/api/employees', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/api/employees/:uuid', async (req, res) => {
+app.put('/api/employees/:uuid', jsonParser, async (req, res) => {
   try {
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
     const result = await query(`
       UPDATE employees
       SET name = $1, phone = $2, license_number = $3, pagibig_number = $4, sss_number = $5,
@@ -817,17 +839,17 @@ app.put('/api/employees/:uuid', async (req, res) => {
       WHERE uuid = $12
       RETURNING *
     `, [
-      req.body.name,
-      req.body.phone || '',
-      req.body.licenseNumber || '',
-      req.body.pagibigNumber || '',
-      req.body.sssNumber || '',
-      req.body.philhealthNumber || '',
-      req.body.address || '',
-      parseFloat(req.body.cashAdvance) || 0,
-      parseFloat(req.body.loans) || 0,
-      req.body.autoDeductCashAdvance !== false,
-      req.body.autoDeductLoans !== false,
+      body.name,
+      body.phone || '',
+      body.licenseNumber || '',
+      body.pagibigNumber || '',
+      body.sssNumber || '',
+      body.philhealthNumber || '',
+      body.address || '',
+      parseFloat(body.cashAdvance) || 0,
+      parseFloat(body.loans) || 0,
+      body.autoDeductCashAdvance !== false,
+      body.autoDeductLoans !== false,
       req.params.uuid
     ]);
 
@@ -835,7 +857,7 @@ app.put('/api/employees/:uuid', async (req, res) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    console.log('Updated employee:', req.body.name);
+    console.log('Updated employee:', body.name);
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating employee:', error);
@@ -923,18 +945,26 @@ app.post('/api/deductions', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/api/deductions/:id', async (req, res) => {
+app.put('/api/deductions/:id', jsonParser, async (req, res) => {
   try {
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
     const result = await query(`
       UPDATE deductions
       SET name = $1, type = $2, value = $3, is_default = $4, updated_at = CURRENT_TIMESTAMP
       WHERE id = $5
       RETURNING *
     `, [
-      req.body.name,
-      req.body.type,
-      parseFloat(req.body.value),
-      req.body.isDefault || false,
+      body.name,
+      body.type,
+      parseFloat(body.value),
+      body.isDefault || false,
       parseInt(req.params.id)
     ]);
 
@@ -942,7 +972,7 @@ app.put('/api/deductions/:id', async (req, res) => {
       return res.status(404).json({ message: 'Deduction not found' });
     }
 
-    console.log('Updated deduction:', req.body.name);
+    console.log('Updated deduction:', body.name);
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating deduction:', error);
@@ -1011,14 +1041,22 @@ app.post('/api/drivers', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/api/drivers/:id', async (req, res) => {
+app.put('/api/drivers/:id', jsonParser, async (req, res) => {
   try {
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
     const result = await query(`
       UPDATE drivers
       SET name = $1, phone = $2, license_number = $3
       WHERE id = $4
       RETURNING *
-    `, [req.body.name, req.body.phone, req.body.licenseNumber, parseInt(req.params.id)]);
+    `, [body.name, body.phone, body.licenseNumber, parseInt(req.params.id)]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Driver not found' });
@@ -1091,14 +1129,22 @@ app.post('/api/helpers', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/api/helpers/:id', async (req, res) => {
+app.put('/api/helpers/:id', jsonParser, async (req, res) => {
   try {
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
     const result = await query(`
       UPDATE helpers
       SET name = $1, phone = $2, address = $3
       WHERE id = $4
       RETURNING *
-    `, [req.body.name, req.body.phone, req.body.address, parseInt(req.params.id)]);
+    `, [body.name, body.phone, body.address, parseInt(req.params.id)]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Helper not found' });
@@ -1207,8 +1253,16 @@ app.post('/api/payslips', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/api/payslips/:id', async (req, res) => {
+app.put('/api/payslips/:id', jsonParser, async (req, res) => {
   try {
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
     const result = await query(`
       UPDATE payslips
       SET payslip_number = $1, employee_uuid = $2, period_start = $3, period_end = $4,
@@ -1216,15 +1270,15 @@ app.put('/api/payslips/:id', async (req, res) => {
       WHERE id = $10
       RETURNING *
     `, [
-      req.body.payslipNumber,
-      req.body.employee?.uuid || req.body.employee_uuid,
-      req.body.period?.startDate || req.body.period_start,
-      req.body.period?.endDate || req.body.period_end,
-      parseFloat(req.body.totals?.grossPay || req.body.gross_pay || 0),
-      parseFloat(req.body.totals?.totalDeductions || req.body.deductions || 0),
-      parseFloat(req.body.totals?.netPay || req.body.net_pay || 0),
-      req.body.status || 'pending',
-      JSON.stringify(req.body),
+      body.payslipNumber,
+      body.employee?.uuid || body.employee_uuid,
+      body.period?.startDate || body.period_start,
+      body.period?.endDate || body.period_end,
+      parseFloat(body.totals?.grossPay || body.gross_pay || 0),
+      parseFloat(body.totals?.totalDeductions || body.deductions || 0),
+      parseFloat(body.totals?.netPay || body.net_pay || 0),
+      body.status || 'pending',
+      JSON.stringify(body),
       req.params.id
     ]);
 
@@ -1232,7 +1286,7 @@ app.put('/api/payslips/:id', async (req, res) => {
       return res.status(404).json({ message: 'Payslip not found' });
     }
 
-    console.log('Updated payslip:', req.body.payslipNumber);
+    console.log('Updated payslip:', body.payslipNumber);
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating payslip:', error);
@@ -1510,17 +1564,25 @@ app.post('/api/vehicles', async (req, res) => {
   }
 });
 
-app.put('/api/vehicles/:id', async (req, res) => {
+app.put('/api/vehicles/:id', jsonParser, async (req, res) => {
   try {
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
     const result = await query(`
       UPDATE vehicles
       SET plate_number = $1, vehicle_class = $2, name = $3, updated_at = CURRENT_TIMESTAMP
       WHERE id = $4
       RETURNING *
     `, [
-      req.body.plateNumber || req.body.plate_number,
-      req.body.vehicleClass || req.body.vehicle_class,
-      req.body.name,
+      body.plateNumber || body.plate_number,
+      body.vehicleClass || body.vehicle_class,
+      body.name,
       parseInt(req.params.id)
     ]);
 
@@ -1528,7 +1590,7 @@ app.put('/api/vehicles/:id', async (req, res) => {
       return res.status(404).json({ message: 'Vehicle not found' });
     }
 
-    console.log('Updated vehicle:', req.body.plateNumber || req.body.plate_number);
+    console.log('Updated vehicle:', body.plateNumber || body.plate_number);
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating vehicle:', error);
@@ -1622,8 +1684,16 @@ app.post('/api/expenses', upload.single('receipt'), async (req, res) => {
   }
 });
 
-app.put('/api/expenses/:id', async (req, res) => {
+app.put('/api/expenses/:id', jsonParser, async (req, res) => {
   try {
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
     const result = await query(`
       UPDATE expenses
       SET date = $1, category = $2, description = $3, vehicle = $4, amount = $5,
@@ -1631,13 +1701,13 @@ app.put('/api/expenses/:id', async (req, res) => {
       WHERE id = $8
       RETURNING *
     `, [
-      req.body.date,
-      req.body.category,
-      req.body.description,
-      req.body.vehicle,
-      parseFloat(req.body.amount),
-      req.body.paymentMethod || req.body.payment_method || 'cash',
-      req.body.notes,
+      body.date,
+      body.category,
+      body.description,
+      body.vehicle,
+      parseFloat(body.amount),
+      body.paymentMethod || body.payment_method || 'cash',
+      body.notes,
       parseInt(req.params.id)
     ]);
 
@@ -1645,7 +1715,7 @@ app.put('/api/expenses/:id', async (req, res) => {
       return res.status(404).json({ message: 'Expense not found' });
     }
 
-    console.log('Updated expense:', req.body.description);
+    console.log('Updated expense:', body.description);
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating expense:', error);
