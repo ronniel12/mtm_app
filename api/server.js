@@ -556,9 +556,6 @@ app.post('/api/trips', jsonParser, async (req, res) => {
       finalTimestamp  // updated_at
     ]);
 
-    // Clear relevant caches when new trip is created
-    cache.del('trips:count');
-
     console.log('Creating new trip:', newTrip.tracking_number);
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -609,9 +606,6 @@ app.put('/api/trips/:id', jsonParser, async (req, res) => {
       return res.status(404).json({ message: 'Trip not found' });
     }
 
-    // Clear relevant caches when trip is updated
-    cache.del('trips:count');
-
     // Transform database format to frontend expected format (snake_case to camelCase)
     const trip = result.rows[0];
     const transformedTrip = {
@@ -651,9 +645,6 @@ app.delete('/api/trips/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Trip not found' });
     }
-
-    // Clear relevant caches when trip is deleted
-    cache.del('trips:count');
 
     res.json({ message: 'Trip deleted successfully' });
   } catch (error) {
