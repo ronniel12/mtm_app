@@ -751,15 +751,14 @@ app.get('/api/employees/:uuid', async (req, res) => {
   }
 });
 
-app.post('/api/employees', async (req, res) => {
+app.post('/api/employees', jsonParser, async (req, res) => {
   try {
-    // Parse JSON body manually to avoid middleware conflicts
-    let body;
-    try {
-      body = JSON.parse(req.body);
-    } catch (parseError) {
-      // If req.body is already parsed, use it directly
-      body = req.body;
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
     }
 
     // Generate UUID if not provided
@@ -882,15 +881,14 @@ app.get('/api/deductions/:id', async (req, res) => {
   }
 });
 
-app.post('/api/deductions', async (req, res) => {
+app.post('/api/deductions', jsonParser, async (req, res) => {
   try {
-    // Parse JSON body manually to avoid middleware conflicts
-    let body;
-    try {
-      body = JSON.parse(req.body);
-    } catch (parseError) {
-      // If req.body is already parsed, use it directly
-      body = req.body;
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
     }
 
     // Store local time directly for TIMESTAMP columns
@@ -977,15 +975,14 @@ app.get('/api/drivers', async (req, res) => {
   }
 });
 
-app.post('/api/drivers', async (req, res) => {
+app.post('/api/drivers', jsonParser, async (req, res) => {
   try {
-    // Parse JSON body manually to avoid middleware conflicts
-    let body;
-    try {
-      body = JSON.parse(req.body);
-    } catch (parseError) {
-      // If req.body is already parsed, use it directly
-      body = req.body;
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
     }
 
     // Store local time directly for TIMESTAMP columns
@@ -1058,15 +1055,14 @@ app.get('/api/helpers', async (req, res) => {
   }
 });
 
-app.post('/api/helpers', async (req, res) => {
+app.post('/api/helpers', jsonParser, async (req, res) => {
   try {
-    // Parse JSON body manually to avoid middleware conflicts
-    let body;
-    try {
-      body = JSON.parse(req.body);
-    } catch (parseError) {
-      // If req.body is already parsed, use it directly
-      body = req.body;
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
     }
 
     // Store local time directly for TIMESTAMP columns
@@ -1335,15 +1331,14 @@ app.get('/api/billings/:id', async (req, res) => {
   }
 });
 
-app.post('/api/billings', async (req, res) => {
+app.post('/api/billings', jsonParser, async (req, res) => {
   try {
-    // Parse JSON body manually to avoid middleware conflicts
-    let body;
-    try {
-      body = JSON.parse(req.body);
-    } catch (parseError) {
-      // If req.body is already parsed, use it directly
-      body = req.body;
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
+
+    // Validate required fields
+    if (!body) {
+      return res.status(400).json({ error: 'Request body is required' });
     }
 
     // Convert frontend UTC timestamp to local time for storage
