@@ -313,7 +313,7 @@ const fetchData = async (forceRefresh = false) => {
 
     const [tripsResponse, employeesResponse] = await Promise.all([
       axios.get(`${API_BASE_URL}/trips/calculated?page=${currentPage.value}&limit=${pageSize.value}${cacheBust}`),
-      axios.get(`${API_BASE_URL}/employees${cacheBust}`)
+      axios.get(`${API_BASE_URL}/employees${forceRefresh ? `?_t=${Date.now()}` : ''}`)
     ])
 
     // Force reactivity update by creating new arrays
