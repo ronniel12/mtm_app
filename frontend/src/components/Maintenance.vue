@@ -1,301 +1,340 @@
 <template>
-  <div class="maintenance-system">
-    <!-- Header -->
-    <div class="maintenance-header">
+  <div class="maintenance-view">
+    <!-- Mobile Header -->
+    <div class="mobile-header" v-if="isMobile">
+      <button @click="toggleMobileMenu" class="mobile-menu-btn">
+        <span class="hamburger-icon">☰</span>
+      </button>
+      <h1 class="mobile-title">🚛 Maintenance</h1>
+      <div class="mobile-actions">
+        <button @click="refreshData" class="refresh-btn" :disabled="loading">
+          <span v-if="loading">⟳</span>
+          <span v-else>🔄</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Desktop Header -->
+    <div class="desktop-header" v-else>
       <div class="header-content">
-        <div class="header-icon">🔧</div>
-        <div class="header-text">
-          <h1>Vehicle Maintenance Tracker</h1>
-          <p>Preventive maintenance scheduling and document management</p>
+        <h1>🚛 Vehicle Maintenance System</h1>
+        <p>Track preventive maintenance schedules and document expiry</p>
+      </div>
+      <div class="header-actions">
+        <button @click="refreshData" class="refresh-btn" :disabled="loading">
+          <span v-if="loading">⟳</span>
+          <span v-else>🔄</span>
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Menu Overlay -->
+    <div v-if="isMobile && showMobileMenu" class="mobile-menu-overlay" @click="toggleMobileMenu">
+      <div class="mobile-menu" @click.stop>
+        <div class="menu-header">
+          <h3>Menu</h3>
+          <button @click="toggleMobileMenu" class="close-menu-btn">✕</button>
+        </div>
+        <div class="menu-items">
+          <button @click="setActiveTab('dashboard')" :class="{ active: activeTab === 'dashboard' }">
+            📊 Dashboard
+          </button>
+          <button @click="setActiveTab('schedules')" :class="{ active: activeTab === 'schedules' }">
+            📅 Schedules
+          </button>
+          <button @click="setActiveTab('documents')" :class="{ active: activeTab === 'documents' }">
+            📄 Documents
+          </button>
+          <button @click="setActiveTab('settings')" :class="{ active: activeTab === 'settings' }">
+            ⚙️ Settings
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Quick Stats Dashboard -->
-    <div class="stats-dashboard">
-      <div class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-content">
-          <h3>{{ stats.totalSchedules }}</h3>
-          <p>Total Schedules</p>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">⚠️</div>
-        <div class="stat-content">
-          <h3>{{ stats.dueSoon }}</h3>
-          <p>Due Soon</p>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🚨</div>
-        <div class="stat-content">
-          <h3>{{ stats.overdue }}</h3>
-          <p>Overdue</p>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">✅</div>
-        <div class="stat-content">
-          <h3>{{ stats.completedThisMonth }}</h3>
-          <p>Completed This Month</p>
-        </div>
-      </div>
+    <!-- Loading State -->
+    <div v-if="loading && !dashboardData" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading maintenance data...</p>
     </div>
 
-    <!-- Main Content Tabs -->
-    <div class="maintenance-tabs">
-      <div class="tab-buttons">
+    <!-- Error State -->
+    <div v-else-if="error" class="error-state">
+      <div class="error-icon">⚠️</div>
+      <h3>Failed to load maintenance data</h3>
+      <p>{{ error }}</p>
+      <button @click="refreshData" class="retry-btn">Try Again</button>
+    </div>
+
+    <!-- Main Content -->
+    <div v-else class="maintenance-content">
+      <!-- Tab Navigation (Desktop) -->
+      <div class="tab-navigation" v-if="!isMobile">
         <button
           v-for="tab in tabs"
-          :key="tab.id"
-          @click="activeTab = tab.id"
-          :class="{ active: activeTab === tab.id }"
-          class="tab-button"
+          :key="tab.key"
+          @click="setActiveTab(tab.key)"
+          :class="{ active: activeTab === tab.key }"
+          class="tab-btn"
         >
           <span class="tab-icon">{{ tab.icon }}</span>
-          <span class="tab-text">{{ tab.name }}</span>
+          <span class="tab-label">{{ tab.label }}</span>
         </button>
+      </div>
+
+      <!-- Dashboard Tab -->
+      <div v-if="activeTab === 'dashboard'" class="tab-content">
+        <div class="dashboard-grid">
+          <!-- Statistics Cards -->
+          <div class="stats-section">
+            <h2>📊 Overview</h2>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-content">
+                  <div class="stat-value">{{ dashboardData?.stats?.totalSchedules || 0 }}</div>
+                  <div class="stat-label">Total Schedules</div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-content">
+                  <div class="stat-value">{{ dashboardData?.stats?.activeSchedules || 0 }}</div>
+                  <div class="stat-label">Active Schedules</div>
+                </div>
+              </div>
+              <div class="stat-card urgent">
+                <div class="stat-icon">🚨</div>
+                <div class="stat-content">
+                  <div class="stat-value">{{ dashboardData?.stats?.overdue || 0 }}</div>
+                  <div class="stat-label">Overdue</div>
+                </div>
+              </div>
+              <div class="stat-card warning">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-content">
+                  <div class="stat-value">{{ dashboardData?.stats?.dueSoon || 0 }}</div>
+                  <div class="stat-label">Due Soon</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upcoming Maintenance -->
+          <div class="upcoming-section">
+            <h2>📅 Upcoming Maintenance</h2>
+            <div v-if="dashboardData?.upcomingMaintenance?.length" class="maintenance-list">
+              <div
+                v-for="item in dashboardData.upcomingMaintenance"
+                :key="item.id"
+                class="maintenance-item"
+                :class="{ urgent: isOverdue(item.next_due_date), warning: isDueSoon(item.next_due_date) }"
+              >
+                <div class="item-header">
+                  <span class="vehicle-plate">{{ item.plate_number }}</span>
+                  <span class="maintenance-type">{{ item.maintenance_type }}</span>
+                </div>
+                <div class="item-details">
+                  <span class="due-date">{{ formatDate(item.next_due_date) }}</span>
+                  <span class="days-left">{{ getDaysUntil(item.next_due_date) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state">
+              <div class="empty-icon">✅</div>
+              <p>No upcoming maintenance scheduled</p>
+            </div>
+          </div>
+
+          <!-- Expiring Documents -->
+          <div class="documents-section">
+            <h2>📄 Expiring Documents</h2>
+            <div v-if="dashboardData?.expiringDocuments?.length" class="documents-list">
+              <div
+                v-for="doc in dashboardData.expiringDocuments"
+                :key="doc.id"
+                class="document-item"
+                :class="{ urgent: isOverdue(doc.expiry_date), warning: isDueSoon(doc.expiry_date) }"
+              >
+                <div class="doc-header">
+                  <span class="vehicle-plate">{{ doc.plate_number }}</span>
+                  <span class="doc-type">{{ doc.document_type }}</span>
+                </div>
+                <div class="doc-details">
+                  <span class="expiry-date">{{ formatDate(doc.expiry_date) }}</span>
+                  <span class="days-left">{{ getDaysUntil(doc.expiry_date) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state">
+              <div class="empty-icon">✅</div>
+              <p>No documents expiring soon</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Schedules Tab -->
       <div v-if="activeTab === 'schedules'" class="tab-content">
-        <div class="tab-header">
-          <h2>Maintenance Schedules</h2>
-          <button @click="showScheduleForm = true" class="btn-primary">
-            + Add Schedule
+        <div class="schedules-header">
+          <h2>📅 Maintenance Schedules</h2>
+          <button @click="showScheduleForm = true" class="add-btn">
+            <span>+</span>
+            Add Schedule
           </button>
         </div>
 
-        <div class="filters-section">
-          <select v-model="scheduleFilters.vehicle_id" @change="loadSchedules" class="filter-select">
-            <option value="">All Vehicles</option>
-            <option v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id">
-              {{ vehicle.plate_number }}
-            </option>
-          </select>
-          <select v-model="scheduleFilters.status" @change="loadSchedules" class="filter-select">
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="paused">Paused</option>
-            <option value="completed">Completed</option>
-          </select>
-          <select v-model="scheduleFilters.category" @change="loadSchedules" class="filter-select">
-            <option value="">All Categories</option>
-            <option value="preventive">Preventive</option>
-            <option value="documentation">Documentation</option>
-            <option value="safety">Safety</option>
-          </select>
-        </div>
-
-        <!-- Desktop Table View -->
-        <div class="schedules-table-container desktop-view">
-          <table class="schedules-table">
-            <thead>
-              <tr>
-                <th>Vehicle</th>
-                <th>Maintenance Type</th>
-                <th>Category</th>
-                <th>Schedule Type</th>
-                <th>Frequency</th>
-                <th>Next Due</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="schedule in schedules" :key="schedule.id" :class="getScheduleRowClass(schedule)">
-                <td>{{ getVehicleName(schedule.vehicle_id) }}</td>
-                <td>{{ schedule.maintenance_type }}</td>
-                <td><span class="category-badge" :class="`category-${schedule.category}`">{{ schedule.category }}</span></td>
-                <td>{{ schedule.schedule_type }}</td>
-                <td>{{ schedule.frequency_value }} {{ schedule.frequency_unit }}</td>
-                <td>{{ formatDate(schedule.next_due_date) }}</td>
-                <td><span class="status-badge" :class="`status-${schedule.status}`">{{ schedule.status }}</span></td>
-                <td>
-                  <div class="action-buttons">
-                    <button @click="editSchedule(schedule)" class="btn-edit">✏️</button>
-                    <button @click="markCompleted(schedule)" class="btn-complete">✅</button>
-                    <button @click="deleteSchedule(schedule.id)" class="btn-delete">🗑️</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Mobile Card View -->
-        <div class="schedules-mobile-cards mobile-view">
-          <div v-for="schedule in schedules" :key="`mobile-${schedule.id}`" class="schedule-card" :class="getScheduleRowClass(schedule)">
-            <div class="card-header">
-              <div class="card-title">{{ schedule.maintenance_type }}</div>
-              <span class="status-badge" :class="`status-${schedule.status}`">{{ schedule.status }}</span>
-            </div>
-
-            <div class="card-content">
-              <div class="card-row">
-                <strong>Vehicle:</strong>
-                <span>{{ getVehicleName(schedule.vehicle_id) }}</span>
+        <div v-if="schedules.length" class="schedules-list">
+          <div
+            v-for="schedule in schedules"
+            :key="schedule.id"
+            class="schedule-card"
+            :class="{ urgent: isOverdue(schedule.next_due_date), warning: isDueSoon(schedule.next_due_date) }"
+          >
+            <div class="schedule-header">
+              <div class="schedule-info">
+                <h3>{{ schedule.maintenance_type }}</h3>
+                <p class="vehicle-name">{{ getVehicleName(schedule.vehicle_id) }}</p>
               </div>
-              <div class="card-row">
-                <strong>Category:</strong>
-                <span class="category-badge" :class="`category-${schedule.category}`">{{ schedule.category }}</span>
-              </div>
-              <div class="card-row">
-                <strong>Schedule:</strong>
-                <span>{{ schedule.schedule_type }} - {{ schedule.frequency_value }} {{ schedule.frequency_unit }}</span>
-              </div>
-              <div class="card-row">
-                <strong>Next Due:</strong>
-                <span>{{ formatDate(schedule.next_due_date) }}</span>
+              <div class="schedule-status">
+                <span class="status-badge" :class="schedule.status">
+                  {{ schedule.status }}
+                </span>
               </div>
             </div>
-
-            <div class="card-actions">
-              <button @click="editSchedule(schedule)" class="btn-edit-mobile">
-                <span class="btn-icon">✏️</span>
-                <span class="btn-text">Edit</span>
-              </button>
-              <button @click="markCompleted(schedule)" class="btn-complete-mobile">
-                <span class="btn-icon">✅</span>
-                <span class="btn-text">Complete</span>
-              </button>
-              <button @click="deleteSchedule(schedule.id)" class="btn-delete-mobile">
-                <span class="btn-icon">🗑️</span>
-                <span class="btn-text">Delete</span>
-              </button>
+            <div class="schedule-details">
+              <div class="detail-item">
+                <span class="label">Category:</span>
+                <span class="value">{{ schedule.category }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Frequency:</span>
+                <span class="value">Every {{ schedule.frequency_value }} {{ schedule.frequency_unit }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Next Due:</span>
+                <span class="value">{{ formatDate(schedule.next_due_date) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Reminder:</span>
+                <span class="value">{{ schedule.reminder_days }} days before</span>
+              </div>
+            </div>
+            <div class="schedule-actions">
+              <button @click="markCompleted(schedule)" class="complete-btn">✅ Complete</button>
+              <button @click="editSchedule(schedule)" class="edit-btn">✏️ Edit</button>
+              <button @click="deleteSchedule(schedule)" class="delete-btn">🗑️ Delete</button>
             </div>
           </div>
+        </div>
+        <div v-else class="empty-state">
+          <div class="empty-icon">📅</div>
+          <h3>No maintenance schedules</h3>
+          <p>Create your first maintenance schedule to get started</p>
+          <button @click="showScheduleForm = true" class="add-btn">Add Schedule</button>
         </div>
       </div>
 
       <!-- Documents Tab -->
       <div v-if="activeTab === 'documents'" class="tab-content">
-        <div class="tab-header">
-          <h2>Vehicle Documents</h2>
-          <button @click="showDocumentForm = true" class="btn-primary">
-            + Add Document
+        <div class="documents-header">
+          <h2>📄 Vehicle Documents</h2>
+          <button @click="showDocumentForm = true" class="add-btn">
+            <span>+</span>
+            Add Document
           </button>
         </div>
 
-        <div class="filters-section">
-          <select v-model="documentFilters.vehicle_id" @change="loadDocuments" class="filter-select">
-            <option value="">All Vehicles</option>
-            <option v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id">
-              {{ vehicle.plate_number }}
-            </option>
-          </select>
-          <select v-model="documentFilters.document_type" @change="loadDocuments" class="filter-select">
-            <option value="">All Types</option>
-            <option value="registration">Registration</option>
-            <option value="insurance">Insurance</option>
-            <option value="permit">Permit</option>
-            <option value="fitness_certificate">Fitness Certificate</option>
-            <option value="emission_certificate">Emission Certificate</option>
-          </select>
-        </div>
-
-        <!-- Desktop Table View -->
-        <div class="documents-table-container desktop-view">
-          <table class="documents-table">
-            <thead>
-              <tr>
-                <th>Vehicle</th>
-                <th>Document Type</th>
-                <th>Document Number</th>
-                <th>Issue Date</th>
-                <th>Expiry Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="doc in documents" :key="doc.id" :class="getDocumentRowClass(doc)">
-                <td>{{ getVehicleName(doc.vehicle_id) }}</td>
-                <td>{{ doc.document_type.replace('_', ' ') }}</td>
-                <td>{{ doc.document_number || 'N/A' }}</td>
-                <td>{{ formatDate(doc.issue_date) }}</td>
-                <td>{{ formatDate(doc.expiry_date) }}</td>
-                <td><span class="status-badge" :class="getDocumentStatusClass(doc)">{{ getDocumentStatus(doc) }}</span></td>
-                <td>
-                  <div class="action-buttons">
-                    <button @click="editDocument(doc)" class="btn-edit">✏️</button>
-                    <button @click="deleteDocument(doc.id)" class="btn-delete">🗑️</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Mobile Card View -->
-        <div class="documents-mobile-cards mobile-view">
-          <div v-for="doc in documents" :key="`mobile-${doc.id}`" class="document-card" :class="getDocumentRowClass(doc)">
-            <div class="card-header">
-              <div class="card-title">{{ doc.document_type.replace('_', ' ') }}</div>
-              <span class="status-badge" :class="getDocumentStatusClass(doc)">{{ getDocumentStatus(doc) }}</span>
-            </div>
-
-            <div class="card-content">
-              <div class="card-row">
-                <strong>Vehicle:</strong>
-                <span>{{ getVehicleName(doc.vehicle_id) }}</span>
+        <div v-if="documents.length" class="documents-list">
+          <div
+            v-for="doc in documents"
+            :key="doc.id"
+            class="document-card"
+            :class="{ urgent: isOverdue(doc.expiry_date), warning: isDueSoon(doc.expiry_date) }"
+          >
+            <div class="document-header">
+              <div class="document-info">
+                <h3>{{ doc.document_type }}</h3>
+                <p class="vehicle-name">{{ getVehicleName(doc.vehicle_id) }}</p>
               </div>
-              <div class="card-row">
-                <strong>Document #:</strong>
-                <span>{{ doc.document_number || 'N/A' }}</span>
-              </div>
-              <div class="card-row">
-                <strong>Issue Date:</strong>
-                <span>{{ formatDate(doc.issue_date) }}</span>
-              </div>
-              <div class="card-row">
-                <strong>Expiry Date:</strong>
-                <span>{{ formatDate(doc.expiry_date) }}</span>
+              <div class="document-status">
+                <span v-if="doc.document_number" class="doc-number">{{ doc.document_number }}</span>
               </div>
             </div>
-
-            <div class="card-actions">
-              <button @click="editDocument(doc)" class="btn-edit-mobile">
-                <span class="btn-icon">✏️</span>
-                <span class="btn-text">Edit</span>
-              </button>
-              <button @click="deleteDocument(doc.id)" class="btn-delete-mobile">
-                <span class="btn-icon">🗑️</span>
-                <span class="btn-text">Delete</span>
-              </button>
+            <div class="document-details">
+              <div class="detail-item">
+                <span class="label">Issued:</span>
+                <span class="value">{{ doc.issue_date ? formatDate(doc.issue_date) : 'N/A' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Expires:</span>
+                <span class="value">{{ formatDate(doc.expiry_date) }}</span>
+              </div>
+              <div class="detail-item" v-if="doc.issuing_authority">
+                <span class="label">Authority:</span>
+                <span class="value">{{ doc.issuing_authority }}</span>
+              </div>
+              <div class="detail-item" v-if="doc.cost">
+                <span class="label">Cost:</span>
+                <span class="value">₱{{ doc.cost }}</span>
+              </div>
+            </div>
+            <div class="document-actions">
+              <button @click="editDocument(doc)" class="edit-btn">✏️ Edit</button>
+              <button @click="deleteDocument(doc)" class="delete-btn">🗑️ Delete</button>
             </div>
           </div>
         </div>
+        <div v-else class="empty-state">
+          <div class="empty-icon">📄</div>
+          <h3>No vehicle documents</h3>
+          <p>Add vehicle registration, insurance, and other documents</p>
+          <button @click="showDocumentForm = true" class="add-btn">Add Document</button>
+        </div>
       </div>
 
-      <!-- Notifications Tab -->
-      <div v-if="activeTab === 'notifications'" class="tab-content">
-        <div class="tab-header">
-          <h2>Notification Preferences</h2>
-          <button @click="showNotificationForm = true" class="btn-primary">
-            + Add Preference
-          </button>
-        </div>
-
-        <div class="notifications-list">
-          <div v-for="pref in notificationPreferences" :key="pref.id" class="notification-card">
-            <div class="notification-content">
-              <div class="notification-header">
-                <h4>{{ pref.maintenance_type || 'All Types' }}</h4>
-                <span class="active-status" :class="{ active: pref.is_active }">
-                  {{ pref.is_active ? 'Active' : 'Inactive' }}
-                </span>
-              </div>
-              <div class="notification-details">
-                <p><strong>Reminder Days:</strong> {{ pref.reminder_days }}</p>
-                <p><strong>Methods:</strong> {{ formatNotificationMethods(pref.notification_methods) }}</p>
-              </div>
+      <!-- Settings Tab -->
+      <div v-if="activeTab === 'settings'" class="tab-content">
+        <h2>⚙️ Notification Settings</h2>
+        <div class="settings-section">
+          <div class="settings-group">
+            <h3>Default Preferences</h3>
+            <div class="setting-item">
+              <label class="setting-label">
+                <span>Reminder Days Before Due</span>
+                <input
+                  v-model.number="settings.reminderDays"
+                  type="number"
+                  min="1"
+                  max="30"
+                  class="setting-input"
+                />
+              </label>
             </div>
-            <div class="notification-actions">
-              <button @click="editNotificationPreference(pref)" class="btn-edit">✏️</button>
-              <button @click="deleteNotificationPreference(pref.id)" class="btn-delete">🗑️</button>
+            <div class="setting-item">
+              <label class="setting-label">
+                <input
+                  v-model="settings.enableInApp"
+                  type="checkbox"
+                  class="setting-checkbox"
+                />
+                <span>Enable In-App Notifications</span>
+              </label>
             </div>
+            <div class="setting-item">
+              <label class="setting-label">
+                <input
+                  v-model="settings.enableEmail"
+                  type="checkbox"
+                  class="setting-checkbox"
+                />
+                <span>Enable Email Notifications</span>
+              </label>
+            </div>
+          </div>
+          <div class="settings-actions">
+            <button @click="saveSettings" class="save-btn">💾 Save Settings</button>
           </div>
         </div>
       </div>
@@ -305,69 +344,48 @@
     <div v-if="showScheduleForm" class="modal-overlay" @click="closeScheduleForm">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3>{{ editingSchedule ? 'Edit Maintenance Schedule' : 'Add Maintenance Schedule' }}</h3>
-          <button @click="closeScheduleForm" class="close-btn">&times;</button>
+          <h3>{{ editingSchedule ? 'Edit Schedule' : 'Add Maintenance Schedule' }}</h3>
+          <button @click="closeScheduleForm" class="close-btn">✕</button>
         </div>
-
         <form @submit.prevent="saveSchedule" class="schedule-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Vehicle *</label>
-              <select v-model="scheduleForm.vehicle_id" required class="form-input">
-                <option value="">Select Vehicle</option>
-                <option v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id">
-                  {{ vehicle.plate_number }} - {{ vehicle.name }}
-                </option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Maintenance Type *</label>
-              <input
-                type="text"
-                v-model="scheduleForm.maintenance_type"
-                placeholder="e.g., Oil Change, Brake Inspection"
-                required
-                class="form-input"
-              />
-            </div>
+          <div class="form-group">
+            <label>Vehicle *</label>
+            <select v-model="scheduleForm.vehicleId" required class="form-select">
+              <option value="">Select Vehicle</option>
+              <option v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id">
+                {{ vehicle.plate_number }} - {{ vehicle.name }}
+              </option>
+            </select>
           </div>
-
+          <div class="form-group">
+            <label>Maintenance Type *</label>
+            <input v-model="scheduleForm.maintenanceType" required class="form-input" placeholder="e.g., Oil Change, Brake Inspection" />
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label>Category *</label>
-              <select v-model="scheduleForm.category" required class="form-input">
-                <option value="">Select Category</option>
-                <option value="preventive">Preventive Maintenance</option>
+              <select v-model="scheduleForm.category" required class="form-select">
+                <option value="preventive">Preventive</option>
                 <option value="documentation">Documentation</option>
-                <option value="safety">Safety Inspection</option>
+                <option value="safety">Safety</option>
               </select>
             </div>
             <div class="form-group">
               <label>Schedule Type *</label>
-              <select v-model="scheduleForm.schedule_type" required class="form-input">
-                <option value="">Select Type</option>
+              <select v-model="scheduleForm.scheduleType" required class="form-select">
                 <option value="time_based">Time Based</option>
                 <option value="mileage_based">Mileage Based</option>
-                <option value="document_based">Document Based</option>
               </select>
             </div>
           </div>
-
           <div class="form-row">
             <div class="form-group">
               <label>Frequency Value *</label>
-              <input
-                type="number"
-                v-model="scheduleForm.frequency_value"
-                min="1"
-                required
-                class="form-input"
-              />
+              <input v-model.number="scheduleForm.frequencyValue" required type="number" min="1" class="form-input" />
             </div>
             <div class="form-group">
               <label>Frequency Unit *</label>
-              <select v-model="scheduleForm.frequency_unit" required class="form-input">
-                <option value="">Select Unit</option>
+              <select v-model="scheduleForm.frequencyUnit" required class="form-select">
                 <option value="days">Days</option>
                 <option value="weeks">Weeks</option>
                 <option value="months">Months</option>
@@ -377,52 +395,21 @@
               </select>
             </div>
           </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Reminder Days</label>
-              <input
-                type="number"
-                v-model="scheduleForm.reminder_days"
-                min="0"
-                placeholder="7"
-                class="form-input"
-              />
-            </div>
-            <div class="form-group">
-              <label>Status</label>
-              <select v-model="scheduleForm.status" class="form-input">
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
+          <div class="form-group">
+            <label>Reminder Days Before</label>
+            <input v-model.number="scheduleForm.reminderDays" type="number" min="0" max="30" class="form-input" />
           </div>
-
           <div class="form-group">
             <label>Last Completed Date</label>
-            <input
-              type="date"
-              v-model="scheduleForm.last_completed_date"
-              class="form-input"
-            />
+            <input v-model="scheduleForm.lastCompletedDate" type="date" class="form-input" />
           </div>
-
           <div class="form-group">
             <label>Notes</label>
-            <textarea
-              v-model="scheduleForm.notes"
-              placeholder="Additional notes"
-              class="form-textarea"
-              rows="3"
-            ></textarea>
+            <textarea v-model="scheduleForm.notes" class="form-textarea" rows="3"></textarea>
           </div>
-
           <div class="form-actions">
-            <button type="button" @click="closeScheduleForm" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">
-              {{ editingSchedule ? 'Update Schedule' : 'Add Schedule' }}
-            </button>
+            <button type="button" @click="closeScheduleForm" class="cancel-btn">Cancel</button>
+            <button type="submit" class="submit-btn">Save Schedule</button>
           </div>
         </form>
       </div>
@@ -432,198 +419,65 @@
     <div v-if="showDocumentForm" class="modal-overlay" @click="closeDocumentForm">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3>{{ editingDocument ? 'Edit Vehicle Document' : 'Add Vehicle Document' }}</h3>
-          <button @click="closeDocumentForm" class="close-btn">&times;</button>
+          <h3>{{ editingDocument ? 'Edit Document' : 'Add Vehicle Document' }}</h3>
+          <button @click="closeDocumentForm" class="close-btn">✕</button>
         </div>
-
         <form @submit.prevent="saveDocument" class="document-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Vehicle *</label>
-              <select v-model="documentForm.vehicle_id" required class="form-input">
-                <option value="">Select Vehicle</option>
-                <option v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id">
-                  {{ vehicle.plate_number }} - {{ vehicle.name }}
-                </option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Document Type *</label>
-              <select v-model="documentForm.document_type" required class="form-input">
-                <option value="">Select Type</option>
-                <option value="registration">Registration</option>
-                <option value="insurance">Insurance</option>
-                <option value="permit">Permit</option>
-                <option value="fitness_certificate">Fitness Certificate</option>
-                <option value="emission_certificate">Emission Certificate</option>
-                <option value="road_tax">Road Tax</option>
-              </select>
-            </div>
+          <div class="form-group">
+            <label>Vehicle *</label>
+            <select v-model="documentForm.vehicleId" required class="form-select">
+              <option value="">Select Vehicle</option>
+              <option v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id">
+                {{ vehicle.plate_number }} - {{ vehicle.name }}
+              </option>
+            </select>
           </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Document Number</label>
-              <input
-                type="text"
-                v-model="documentForm.document_number"
-                placeholder="Document number (optional)"
-                class="form-input"
-              />
-            </div>
-            <div class="form-group">
-              <label>Issuing Authority</label>
-              <input
-                type="text"
-                v-model="documentForm.issuing_authority"
-                placeholder="e.g., LTO, Insurance Company"
-                class="form-input"
-              />
-            </div>
+          <div class="form-group">
+            <label>Document Type *</label>
+            <select v-model="documentForm.documentType" required class="form-select">
+              <option value="">Select Type</option>
+              <option value="registration">Registration</option>
+              <option value="insurance">Insurance</option>
+              <option value="permit">Permit</option>
+              <option value="fitness_certificate">Fitness Certificate</option>
+              <option value="emission_certificate">Emission Certificate</option>
+              <option value="road_tax">Road Tax</option>
+            </select>
           </div>
-
+          <div class="form-group">
+            <label>Document Number</label>
+            <input v-model="documentForm.documentNumber" class="form-input" placeholder="Document reference number" />
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label>Issue Date</label>
-              <input
-                type="date"
-                v-model="documentForm.issue_date"
-                class="form-input"
-              />
+              <input v-model="documentForm.issueDate" type="date" class="form-input" />
             </div>
             <div class="form-group">
               <label>Expiry Date *</label>
-              <input
-                type="date"
-                v-model="documentForm.expiry_date"
-                required
-                class="form-input"
-              />
+              <input v-model="documentForm.expiryDate" required type="date" class="form-input" />
             </div>
           </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Cost</label>
-              <input
-                type="number"
-                v-model="documentForm.cost"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                class="form-input"
-              />
-            </div>
-            <div class="form-group">
-              <label>Document File Path</label>
-              <input
-                type="text"
-                v-model="documentForm.document_file_path"
-                placeholder="Path to uploaded document"
-                class="form-input"
-              />
-            </div>
+          <div class="form-group">
+            <label>Issuing Authority</label>
+            <input v-model="documentForm.issuingAuthority" class="form-input" placeholder="e.g., LTO, Insurance Company" />
           </div>
-
+          <div class="form-group">
+            <label>Cost (₱)</label>
+            <input v-model.number="documentForm.cost" type="number" step="0.01" min="0" class="form-input" />
+          </div>
           <div class="form-group">
             <label>Notes</label>
-            <textarea
-              v-model="documentForm.notes"
-              placeholder="Additional notes"
-              class="form-textarea"
-              rows="3"
-            ></textarea>
+            <textarea v-model="documentForm.notes" class="form-textarea" rows="3"></textarea>
           </div>
-
           <div class="form-actions">
-            <button type="button" @click="closeDocumentForm" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">
-              {{ editingDocument ? 'Update Document' : 'Add Document' }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Notification Preference Form Modal -->
-    <div v-if="showNotificationForm" class="modal-overlay" @click="closeNotificationForm">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>{{ editingNotification ? 'Edit Notification Preference' : 'Add Notification Preference' }}</h3>
-          <button @click="closeNotificationForm" class="close-btn">&times;</button>
-        </div>
-
-        <form @submit.prevent="saveNotificationPreference" class="notification-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Maintenance Type</label>
-              <input
-                type="text"
-                v-model="notificationForm.maintenance_type"
-                placeholder="Specific type or 'all' for all types"
-                class="form-input"
-              />
-            </div>
-            <div class="form-group">
-              <label>Reminder Days *</label>
-              <input
-                type="number"
-                v-model="notificationForm.reminder_days"
-                min="0"
-                required
-                class="form-input"
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Notification Methods *</label>
-            <div class="checkbox-group">
-              <label class="checkbox-label">
-                <input type="checkbox" value="sms" v-model="notificationForm.notification_methods_list">
-                SMS
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" value="whatsapp" v-model="notificationForm.notification_methods_list">
-                WhatsApp
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" value="facebook" v-model="notificationForm.notification_methods_list">
-                Facebook Messenger
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" value="viber" v-model="notificationForm.notification_methods_list">
-                Viber
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" value="in_app" v-model="notificationForm.notification_methods_list">
-                In-App Notification
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" value="push" v-model="notificationForm.notification_methods_list">
-                Push Notification
-              </label>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="notificationForm.is_active">
-              Active
-            </label>
-          </div>
-
-          <div class="form-actions">
-            <button type="button" @click="closeNotificationForm" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">
-              {{ editingNotification ? 'Update Preference' : 'Add Preference' }}
-            </button>
+            <button type="button" @click="closeDocumentForm" class="cancel-btn">Cancel</button>
+            <button type="submit" class="submit-btn">Save Document</button>
           </div>
         </form>
       </div>
     </div>
   </div>
-</div>
 </template>
 
 <script setup>
@@ -632,254 +486,161 @@ import axios from 'axios'
 import { API_BASE_URL } from '@/api/config'
 
 // Reactive data
-const stats = ref({
-  totalSchedules: 0,
-  activeSchedules: 0,
-  dueSoon: 0,
-  overdue: 0,
-  completedThisMonth: 0
-})
+const loading = ref(false)
+const error = ref(null)
+const isMobile = ref(window.innerWidth < 768)
+const showMobileMenu = ref(false)
+const activeTab = ref('dashboard')
 
-const vehicles = ref([])
+// Data
+const dashboardData = ref(null)
 const schedules = ref([])
 const documents = ref([])
-const notificationPreferences = ref([])
+const vehicles = ref([])
 
-const activeTab = ref('schedules')
+// Forms
 const showScheduleForm = ref(false)
 const showDocumentForm = ref(false)
-const showNotificationForm = ref(false)
-
 const editingSchedule = ref(null)
 const editingDocument = ref(null)
-const editingNotification = ref(null)
-
-// Filters
-const scheduleFilters = ref({
-  vehicle_id: '',
-  status: '',
-  category: ''
-})
-
-const documentFilters = ref({
-  vehicle_id: '',
-  document_type: ''
-})
 
 // Form data
 const scheduleForm = ref({
-  vehicle_id: '',
-  maintenance_type: '',
-  category: '',
-  schedule_type: '',
-  frequency_value: '',
-  frequency_unit: '',
-  reminder_days: 7,
-  last_completed_date: '',
-  status: 'active',
+  vehicleId: '',
+  maintenanceType: '',
+  category: 'preventive',
+  scheduleType: 'time_based',
+  frequencyValue: 1,
+  frequencyUnit: 'months',
+  reminderDays: 7,
+  lastCompletedDate: '',
   notes: ''
 })
 
 const documentForm = ref({
-  vehicle_id: '',
-  document_type: '',
-  document_number: '',
-  issue_date: '',
-  expiry_date: '',
-  issuing_authority: '',
-  cost: '',
-  document_file_path: '',
+  vehicleId: '',
+  documentType: '',
+  documentNumber: '',
+  issueDate: '',
+  expiryDate: '',
+  issuingAuthority: '',
+  cost: null,
   notes: ''
 })
 
-const notificationForm = ref({
-  maintenance_type: '',
-  reminder_days: 7,
-  notification_methods_list: ['in_app'],
-  is_active: true
+// Settings
+const settings = ref({
+  reminderDays: 7,
+  enableInApp: true,
+  enableEmail: false
 })
 
 // Tabs configuration
 const tabs = [
-  { id: 'schedules', name: 'Schedules', icon: '📅' },
-  { id: 'documents', name: 'Documents', icon: '📄' },
-  { id: 'notifications', name: 'Notifications', icon: '🔔' }
+  { key: 'dashboard', label: 'Dashboard', icon: '📊' },
+  { key: 'schedules', label: 'Schedules', icon: '📅' },
+  { key: 'documents', label: 'Documents', icon: '📄' },
+  { key: 'settings', label: 'Settings', icon: '⚙️' }
 ]
 
 // Methods
-const loadDashboardStats = async () => {
+const toggleMobileMenu = () => {
+  showMobileMenu.value = !showMobileMenu.value
+}
+
+const setActiveTab = (tab) => {
+  activeTab.value = tab
+  showMobileMenu.value = false
+}
+
+const refreshData = async () => {
+  await loadAllData()
+}
+
+const loadAllData = async () => {
+  loading.value = true
+  error.value = null
+
   try {
-    const response = await axios.get(`${API_BASE_URL}/maintenance/dashboard`)
-    stats.value = response.data.stats
-  } catch (error) {
-    console.error('Error loading dashboard stats:', error)
+    // Load dashboard data
+    const dashboardResponse = await axios.get(`${API_BASE_URL}/maintenance/dashboard`)
+    dashboardData.value = dashboardResponse.data
+
+    // Load schedules
+    const schedulesResponse = await axios.get(`${API_BASE_URL}/maintenance/schedules`)
+    schedules.value = schedulesResponse.data
+
+    // Load documents
+    const documentsResponse = await axios.get(`${API_BASE_URL}/maintenance/documents`)
+    documents.value = documentsResponse.data
+
+    // Load vehicles
+    const vehiclesResponse = await axios.get(`${API_BASE_URL}/vehicles`)
+    vehicles.value = vehiclesResponse.data
+
+  } catch (err) {
+    console.error('Error loading maintenance data:', err)
+    error.value = err.response?.data?.error || 'Failed to load maintenance data'
+  } finally {
+    loading.value = false
   }
 }
 
-const loadVehicles = async () => {
+// Schedule methods
+const markCompleted = async (schedule) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/vehicles`)
-    vehicles.value = response.data
-  } catch (error) {
-    console.error('Error loading vehicles:', error)
-  }
-}
-
-const loadSchedules = async () => {
-  try {
-    const params = new URLSearchParams()
-    if (scheduleFilters.value.vehicle_id) params.append('vehicle_id', scheduleFilters.value.vehicle_id)
-    if (scheduleFilters.value.status) params.append('status', scheduleFilters.value.status)
-    if (scheduleFilters.value.category) params.append('category', scheduleFilters.value.category)
-
-    const response = await axios.get(`${API_BASE_URL}/maintenance/schedules?${params}`)
-    schedules.value = response.data
-  } catch (error) {
-    console.error('Error loading schedules:', error)
-  }
-}
-
-const loadDocuments = async () => {
-  try {
-    const params = new URLSearchParams()
-    if (documentFilters.value.vehicle_id) params.append('vehicle_id', documentFilters.value.vehicle_id)
-    if (documentFilters.value.document_type) params.append('document_type', documentFilters.value.document_type)
-
-    const response = await axios.get(`${API_BASE_URL}/maintenance/documents?${params}`)
-    documents.value = response.data
-  } catch (error) {
-    console.error('Error loading documents:', error)
-  }
-}
-
-const loadNotificationPreferences = async () => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/maintenance/notifications/preferences`)
-    notificationPreferences.value = response.data
-  } catch (error) {
-    console.error('Error loading notification preferences:', error)
-  }
-}
-
-const getVehicleName = (vehicleId) => {
-  const vehicle = vehicles.value.find(v => v.id === vehicleId)
-  return vehicle ? `${vehicle.plate_number} ${vehicle.name ? `(${vehicle.name})` : ''}` : 'Unknown Vehicle'
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-}
-
-const getScheduleRowClass = (schedule) => {
-  if (schedule.status === 'completed') return 'completed'
-  if (schedule.next_due_date) {
-    const dueDate = new Date(schedule.next_due_date)
-    const today = new Date()
-    const daysDiff = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24))
-
-    if (daysDiff < 0) return 'overdue'
-    if (daysDiff <= 7) return 'due-soon'
-  }
-  return ''
-}
-
-const getDocumentRowClass = (doc) => {
-  if (doc.expiry_date) {
-    const expiryDate = new Date(doc.expiry_date)
-    const today = new Date()
-    const daysDiff = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24))
-
-    if (daysDiff < 0) return 'expired'
-    if (daysDiff <= 30) return 'expiring-soon'
-  }
-  return ''
-}
-
-const getDocumentStatus = (doc) => {
-  if (!doc.expiry_date) return 'Unknown'
-
-  const expiryDate = new Date(doc.expiry_date)
-  const today = new Date()
-  const daysDiff = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24))
-
-  if (daysDiff < 0) return 'Expired'
-  if (daysDiff <= 30) return 'Expiring Soon'
-  return 'Valid'
-}
-
-const getDocumentStatusClass = (doc) => {
-  const status = getDocumentStatus(doc)
-  switch (status) {
-    case 'Expired': return 'status-expired'
-    case 'Expiring Soon': return 'status-warning'
-    default: return 'status-valid'
-  }
-}
-
-const formatNotificationMethods = (methodsJson) => {
-  try {
-    const methods = JSON.parse(methodsJson || '[]')
-    return methods.map(method => method.replace('_', ' ')).join(', ')
-  } catch {
-    return 'None'
-  }
-}
-
-// CRUD operations for schedules
-const saveSchedule = async () => {
-  try {
-    const formData = { ...scheduleForm.value }
-
-    if (editingSchedule.value) {
-      await axios.put(`${API_BASE_URL}/maintenance/schedules/${editingSchedule.value.id}`, formData)
-    } else {
-      await axios.post(`${API_BASE_URL}/maintenance/schedules`, formData)
-    }
-
-    closeScheduleForm()
-    loadSchedules()
-    loadDashboardStats()
-  } catch (error) {
-    console.error('Error saving schedule:', error)
+    const today = new Date().toISOString().split('T')[0]
+    await axios.put(`${API_BASE_URL}/maintenance/schedules/${schedule.id}`, {
+      lastCompletedDate: today,
+      status: 'active'
+    })
+    await loadAllData()
+  } catch (err) {
+    console.error('Error marking schedule complete:', err)
   }
 }
 
 const editSchedule = (schedule) => {
   editingSchedule.value = schedule
-  scheduleForm.value = { ...schedule }
+  scheduleForm.value = {
+    vehicleId: schedule.vehicle_id,
+    maintenanceType: schedule.maintenance_type,
+    category: schedule.category,
+    scheduleType: schedule.schedule_type,
+    frequencyValue: schedule.frequency_value,
+    frequencyUnit: schedule.frequency_unit,
+    reminderDays: schedule.reminder_days,
+    lastCompletedDate: schedule.last_completed_date,
+    notes: schedule.notes
+  }
   showScheduleForm.value = true
 }
 
-const markCompleted = async (schedule) => {
-  try {
-    const updatedSchedule = {
-      ...schedule,
-      last_completed_date: new Date().toISOString().split('T')[0],
-      status: 'completed'
+const deleteSchedule = async (schedule) => {
+  if (confirm(`Delete maintenance schedule for "${schedule.maintenance_type}"?`)) {
+    try {
+      await axios.delete(`${API_BASE_URL}/maintenance/schedules/${schedule.id}`)
+      await loadAllData()
+    } catch (err) {
+      console.error('Error deleting schedule:', err)
     }
-
-    await axios.put(`${API_BASE_URL}/maintenance/schedules/${schedule.id}`, updatedSchedule)
-    loadSchedules()
-    loadDashboardStats()
-  } catch (error) {
-    console.error('Error marking schedule as completed:', error)
   }
 }
 
-const deleteSchedule = async (id) => {
-  if (confirm('Are you sure you want to delete this maintenance schedule?')) {
-    try {
-      await axios.delete(`${API_BASE_URL}/maintenance/schedules/${id}`)
-      loadSchedules()
-      loadDashboardStats()
-    } catch (error) {
-      console.error('Error deleting schedule:', error)
+const saveSchedule = async () => {
+  try {
+    const data = { ...scheduleForm.value }
+
+    if (editingSchedule.value) {
+      await axios.put(`${API_BASE_URL}/maintenance/schedules/${editingSchedule.value.id}`, data)
+    } else {
+      await axios.post(`${API_BASE_URL}/maintenance/schedules`, data)
     }
+
+    closeScheduleForm()
+    await loadAllData()
+  } catch (err) {
+    console.error('Error saving schedule:', err)
   }
 }
 
@@ -887,51 +648,59 @@ const closeScheduleForm = () => {
   showScheduleForm.value = false
   editingSchedule.value = null
   scheduleForm.value = {
-    vehicle_id: '',
-    maintenance_type: '',
-    category: '',
-    schedule_type: '',
-    frequency_value: '',
-    frequency_unit: '',
-    reminder_days: 7,
-    last_completed_date: '',
-    status: 'active',
+    vehicleId: '',
+    maintenanceType: '',
+    category: 'preventive',
+    scheduleType: 'time_based',
+    frequencyValue: 1,
+    frequencyUnit: 'months',
+    reminderDays: 7,
+    lastCompletedDate: '',
     notes: ''
   }
 }
 
-// CRUD operations for documents
-const saveDocument = async () => {
-  try {
-    const formData = { ...documentForm.value }
-
-    if (editingDocument.value) {
-      await axios.put(`${API_BASE_URL}/maintenance/documents/${editingDocument.value.id}`, formData)
-    } else {
-      await axios.post(`${API_BASE_URL}/maintenance/documents`, formData)
-    }
-
-    closeDocumentForm()
-    loadDocuments()
-  } catch (error) {
-    console.error('Error saving document:', error)
-  }
-}
-
+// Document methods
 const editDocument = (document) => {
   editingDocument.value = document
-  documentForm.value = { ...document }
+  documentForm.value = {
+    vehicleId: document.vehicle_id,
+    documentType: document.document_type,
+    documentNumber: document.document_number,
+    issueDate: document.issue_date,
+    expiryDate: document.expiry_date,
+    issuingAuthority: document.issuing_authority,
+    cost: document.cost,
+    notes: document.notes
+  }
   showDocumentForm.value = true
 }
 
-const deleteDocument = async (id) => {
-  if (confirm('Are you sure you want to delete this document?')) {
+const deleteDocument = async (document) => {
+  if (confirm(`Delete document "${document.document_type}"?`)) {
     try {
-      await axios.delete(`${API_BASE_URL}/maintenance/documents/${id}`)
-      loadDocuments()
-    } catch (error) {
-      console.error('Error deleting document:', error)
+      await axios.delete(`${API_BASE_URL}/maintenance/documents/${document.id}`)
+      await loadAllData()
+    } catch (err) {
+      console.error('Error deleting document:', err)
     }
+  }
+}
+
+const saveDocument = async () => {
+  try {
+    const data = { ...documentForm.value }
+
+    if (editingDocument.value) {
+      await axios.put(`${API_BASE_URL}/maintenance/documents/${editingDocument.value.id}`, data)
+    } else {
+      await axios.post(`${API_BASE_URL}/maintenance/documents`, data)
+    }
+
+    closeDocumentForm()
+    await loadAllData()
+  } catch (err) {
+    console.error('Error saving document:', err)
   }
 }
 
@@ -939,598 +708,703 @@ const closeDocumentForm = () => {
   showDocumentForm.value = false
   editingDocument.value = null
   documentForm.value = {
-    vehicle_id: '',
-    document_type: '',
-    document_number: '',
-    issue_date: '',
-    expiry_date: '',
-    issuing_authority: '',
-    cost: '',
-    document_file_path: '',
+    vehicleId: '',
+    documentType: '',
+    documentNumber: '',
+    issueDate: '',
+    expiryDate: '',
+    issuingAuthority: '',
+    cost: null,
     notes: ''
   }
 }
 
-// CRUD operations for notification preferences
-const saveNotificationPreference = async () => {
+// Settings methods
+const saveSettings = async () => {
   try {
-    const formData = {
-      ...notificationForm.value,
-      notification_methods: JSON.stringify(notificationForm.value.notification_methods_list)
-    }
+    // Save notification preferences
+    await axios.post(`${API_BASE_URL}/maintenance/notifications/preferences`, {
+      userId: 1, // Default user for now
+      maintenanceType: 'all',
+      reminderDays: settings.value.reminderDays,
+      notificationMethods: [
+        settings.value.enableInApp ? 'in_app' : null,
+        settings.value.enableEmail ? 'email' : null
+      ].filter(Boolean)
+    })
 
-    if (editingNotification.value) {
-      await axios.put(`${API_BASE_URL}/maintenance/notifications/preferences/${editingNotification.value.id}`, formData)
-    } else {
-      await axios.post(`${API_BASE_URL}/maintenance/notifications/preferences`, formData)
-    }
-
-    closeNotificationForm()
-    loadNotificationPreferences()
-  } catch (error) {
-    console.error('Error saving notification preference:', error)
+    alert('Settings saved successfully!')
+  } catch (err) {
+    console.error('Error saving settings:', err)
   }
 }
 
-const editNotificationPreference = (preference) => {
-  editingNotification.value = preference
-  notificationForm.value = {
-    ...preference,
-    notification_methods_list: JSON.parse(preference.notification_methods || '[]')
-  }
-  showNotificationForm.value = true
+// Utility methods
+const getVehicleName = (vehicleId) => {
+  const vehicle = vehicles.value.find(v => v.id === vehicleId)
+  return vehicle ? `${vehicle.plate_number} - ${vehicle.name || 'Unnamed'}` : 'Unknown Vehicle'
 }
 
-const deleteNotificationPreference = async (id) => {
-  if (confirm('Are you sure you want to delete this notification preference?')) {
-    try {
-      await axios.delete(`${API_BASE_URL}/maintenance/notifications/preferences/${id}`)
-      loadNotificationPreferences()
-    } catch (error) {
-      console.error('Error deleting notification preference:', error)
-    }
-  }
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A'
+  return new Date(dateString).toLocaleDateString()
 }
 
-const closeNotificationForm = () => {
-  showNotificationForm.value = false
-  editingNotification.value = null
-  notificationForm.value = {
-    maintenance_type: '',
-    reminder_days: 7,
-    notification_methods_list: ['in_app'],
-    is_active: true
-  }
+const isOverdue = (dateString) => {
+  if (!dateString) return false
+  const date = new Date(dateString)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return date < today
 }
 
-// Lifecycle
-onMounted(async () => {
-  await Promise.all([
-    loadDashboardStats(),
-    loadVehicles(),
-    loadSchedules(),
-    loadDocuments(),
-    loadNotificationPreferences()
-  ])
+const isDueSoon = (dateString) => {
+  if (!dateString) return false
+  const date = new Date(dateString)
+  const today = new Date()
+  const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+  return date >= today && date <= sevenDaysFromNow
+}
+
+const getDaysUntil = (dateString) => {
+  if (!dateString) return 'N/A'
+  const date = new Date(dateString)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  date.setHours(0, 0, 0, 0)
+
+  const diffTime = date.getTime() - today.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+  if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`
+  if (diffDays === 0) return 'Due today'
+  if (diffDays === 1) return 'Due tomorrow'
+  return `${diffDays} days`
+}
+
+// Responsive handling
+const handleResize = () => {
+  isMobile.value = window.innerWidth < 768
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleResize)
+  loadAllData()
 })
+
+// Cleanup
+const onUnmounted = () => {
+  window.removeEventListener('resize', handleResize)
+}
 </script>
 
 <style scoped>
-.maintenance-system {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2rem;
-  background: white;
+.maintenance-view {
   min-height: 100vh;
+  background: #f8f9fa;
 }
 
-.maintenance-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 2rem;
-  border-radius: 12px;
-  margin-bottom: 2rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.header-content {
+/* Mobile Header */
+.mobile-header {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  justify-content: space-between;
+  padding: 1rem;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.header-icon {
-  font-size: 3rem;
-  opacity: 0.9;
+.mobile-menu-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
 }
 
-.header-text h1 {
-  margin: 0 0 0.5rem 0;
-  font-size: 2.5rem;
-  font-weight: 700;
-}
-
-.header-text p {
+.mobile-title {
+  font-size: 1.2rem;
   margin: 0;
-  font-size: 1.1rem;
-  opacity: 0.9;
+  font-weight: 600;
 }
 
-.stats-dashboard {
+.mobile-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.refresh-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.refresh-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+/* Desktop Header */
+.desktop-header {
+  background: white;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-content h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 2rem;
+  color: #333;
+}
+
+.header-content p {
+  margin: 0;
+  color: #666;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+/* Mobile Menu */
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+}
+
+.mobile-menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100vh;
+  background: white;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.2);
+}
+
+.menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.menu-header h3 {
+  margin: 0;
+}
+
+.close-menu-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.menu-items {
+  padding: 1rem 0;
+}
+
+.menu-items button {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.menu-items button:hover,
+.menu-items button.active {
+  background: #f8f9fa;
+  font-weight: 600;
+}
+
+/* Tab Navigation */
+.tab-navigation {
+  background: white;
+  border-bottom: 1px solid #dee2e6;
+  display: flex;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover,
+.tab-btn.active {
+  background: #f8f9fa;
+  border-bottom-color: #007bff;
+  color: #007bff;
+}
+
+.tab-icon {
+  font-size: 1.5rem;
+}
+
+.tab-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Tab Content */
+.tab-content {
+  padding: 2rem;
+}
+
+/* Dashboard */
+.dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.stats-section h2,
+.upcoming-section h2,
+.documents-section h2 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 
 .stat-card {
   background: white;
-  border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   display: flex;
   align-items: center;
   gap: 1rem;
-  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+.stat-card.urgent {
+  border-left: 4px solid #dc3545;
+}
+
+.stat-card.warning {
+  border-left: 4px solid #ffc107;
 }
 
 .stat-icon {
-  font-size: 2.5rem;
-  opacity: 0.8;
-}
-
-.stat-content h3 {
-  margin: 0 0 0.25rem 0;
   font-size: 2rem;
-  font-weight: 700;
-  color: #1f2937;
 }
 
-.stat-content p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.9rem;
-}
-
-.maintenance-tabs {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.tab-buttons {
-  display: flex;
-  background: #f8fafc;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.tab-button {
+.stat-content {
   flex: 1;
-  padding: 1rem 1.5rem;
-  border: none;
-  background: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  color: #6b7280;
-  transition: all 0.2s;
-  border-bottom: 3px solid transparent;
 }
 
-.tab-button:hover {
-  background: #f1f5f9;
-  color: #374151;
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 0.25rem;
 }
 
-.tab-button.active {
-  color: #3b82f6;
-  border-bottom-color: #3b82f6;
-  background: white;
-}
-
-.tab-icon {
-  font-size: 1.1rem;
-}
-
-.tab-text {
+.stat-label {
+  color: #666;
   font-size: 0.9rem;
 }
 
-.tab-content {
-  padding: 2rem;
-}
-
-.tab-header {
+/* Lists */
+.maintenance-list,
+.documents-list {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-}
-
-.tab-header h2 {
-  margin: 0;
-  color: #1f2937;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.filters-section {
-  display: flex;
+  flex-direction: column;
   gap: 1rem;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
 }
 
-.filter-select {
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  min-width: 150px;
-}
-
-/* Table Styles */
-.schedules-table-container,
-.documents-table-container {
-  overflow-x: auto;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.schedules-table,
-.documents-table {
-  width: 100%;
-  min-width: 1000px;
-  border-collapse: collapse;
+.maintenance-item,
+.document-item {
   background: white;
-}
-
-.schedules-table th,
-.schedules-table td,
-.documents-table th,
-.documents-table td {
   padding: 1rem;
-  text-align: left;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.schedules-table th,
-.documents-table th {
-  background: #f8fafc;
-  font-weight: 600;
-  color: #374151;
-  white-space: nowrap;
-}
-
-.schedules-table tbody tr:hover,
-.documents-table tbody tr:hover {
-  background: #f8fafc;
-}
-
-/* Status and Category Badges */
-.status-badge,
-.category-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-.status-active {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.status-paused {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-completed {
-  background: #e0e7ff;
-  color: #3730a3;
-}
-
-.status-expired {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.status-warning {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-valid {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.category-preventive {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.category-documentation {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.category-safety {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-/* Action Buttons */
-.action-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.btn-edit, .btn-delete, .btn-complete {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 4px;
-  font-size: 1rem;
-  transition: background 0.2s;
-}
-
-.btn-edit:hover {
-  background: #dbeafe;
-}
-
-.btn-delete:hover {
-  background: #fee2e2;
-}
-
-.btn-complete:hover {
-  background: #dcfce7;
-}
-
-/* Row Classes */
-.overdue {
-  background: #fef2f2 !important;
-}
-
-.due-soon {
-  background: #fef3c7 !important;
-}
-
-.completed {
-  background: #f0fdf4 !important;
-  opacity: 0.7;
-}
-
-.expired {
-  background: #fef2f2 !important;
-}
-
-.expiring-soon {
-  background: #fef3c7 !important;
-}
-
-/* Mobile Card Views */
-.mobile-view {
-  display: none;
-}
-
-.schedules-mobile-cards,
-.documents-mobile-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.schedule-card,
-.document-card {
-  background: white;
   border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e5e7eb;
+.maintenance-item.urgent,
+.document-item.urgent {
+  border-left: 4px solid #dc3545;
 }
 
-.card-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #1f2937;
+.maintenance-item.warning,
+.document-item.warning {
+  border-left: 4px solid #ffc107;
 }
 
-.card-content {
-  margin-bottom: 1rem;
-}
-
-.card-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 0.75rem;
-  gap: 1rem;
-}
-
-.card-row strong {
-  font-weight: 600;
-  color: #374151;
-  min-width: 100px;
-  flex-shrink: 0;
-}
-
-.card-row span {
-  color: #6b7280;
-  text-align: right;
-  flex: 1;
-  word-wrap: break-word;
-}
-
-.card-actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-}
-
-.btn-edit-mobile,
-.btn-delete-mobile,
-.btn-complete-mobile {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 80px;
-  justify-content: center;
-}
-
-.btn-edit-mobile {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.btn-edit-mobile:hover {
-  background: #bfdbfe;
-}
-
-.btn-delete-mobile {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.btn-delete-mobile:hover {
-  background: #fecaca;
-}
-
-.btn-complete-mobile {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.btn-complete-mobile:hover {
-  background: #bbf7d0;
-}
-
-.btn-icon {
-  font-size: 1rem;
-}
-
-.btn-text {
-  font-size: 0.85rem;
-}
-
-/* Notifications */
-.notifications-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.notification-card {
-  background: white;
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.notification-content {
-  flex: 1;
-}
-
-.notification-header {
+.item-header,
+.doc-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
 }
 
-.notification-header h4 {
-  margin: 0;
-  color: #1f2937;
+.vehicle-plate {
+  font-weight: bold;
+  color: #333;
 }
 
-.active-status {
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-.active-status.active {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.active-status:not(.active) {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.notification-details {
-  color: #6b7280;
+.maintenance-type,
+.doc-type {
+  color: #666;
   font-size: 0.9rem;
 }
 
-.notification-details p {
-  margin: 0.25rem 0;
+.item-details,
+.doc-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.notification-actions {
+.due-date,
+.expiry-date {
+  color: #666;
+}
+
+.days-left {
+  font-weight: bold;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.maintenance-item.urgent .days-left,
+.document-item.urgent .days-left {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.maintenance-item.warning .days-left,
+.document-item.warning .days-left {
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* Schedules */
+.schedules-header,
+.documents-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.schedules-header h2,
+.documents-header h2 {
+  margin: 0;
+}
+
+.add-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.add-btn:hover {
+  background: #218838;
+}
+
+.schedules-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+.schedule-card,
+.document-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.schedule-card.urgent,
+.document-card.urgent {
+  border-left: 4px solid #dc3545;
+}
+
+.schedule-card.warning,
+.document-card.warning {
+  border-left: 4px solid #ffc107;
+}
+
+.schedule-header,
+.document-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.schedule-info h3,
+.document-info h3 {
+  margin: 0 0 0.25rem 0;
+  color: #333;
+}
+
+.vehicle-name {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.schedule-status {
+  text-align: right;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.paused {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.completed {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.schedule-details,
+.document-details {
+  margin-bottom: 1rem;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f8f9fa;
+}
+
+.detail-item:last-child {
+  border-bottom: none;
+}
+
+.label {
+  color: #666;
+  font-weight: 500;
+}
+
+.value {
+  color: #333;
+  text-align: right;
+}
+
+.schedule-actions,
+.document-actions {
   display: flex;
   gap: 0.5rem;
 }
 
-/* Modal Styles */
+.complete-btn,
+.edit-btn,
+.delete-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.complete-btn {
+  background: #28a745;
+  color: white;
+}
+
+.complete-btn:hover {
+  background: #218838;
+}
+
+.edit-btn {
+  background: #007bff;
+  color: white;
+}
+
+.edit-btn:hover {
+  background: #0056b3;
+}
+
+.delete-btn {
+  background: #dc3545;
+  color: white;
+}
+
+.delete-btn:hover {
+  background: #c82333;
+}
+
+/* Settings */
+.settings-section {
+  max-width: 600px;
+}
+
+.settings-group {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.settings-group h3 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+}
+
+.setting-item {
+  margin-bottom: 1rem;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.setting-input,
+.setting-checkbox {
+  margin-left: auto;
+}
+
+.setting-input {
+  width: 80px;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.setting-checkbox {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-actions {
+  text-align: right;
+}
+
+.save-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.save-btn:hover {
+  background: #0056b3;
+}
+
+/* Empty States */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.empty-state p {
+  margin: 0 0 1.5rem 0;
+  color: #666;
+}
+
+/* Modals */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0,0,0,0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 300;
   padding: 1rem;
 }
 
 .modal-content {
   background: white;
-  border-radius: 12px;
-  max-width: 600px;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  max-width: 500px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
 .modal-header {
@@ -1538,14 +1412,12 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #dee2e6;
 }
 
 .modal-header h3 {
   margin: 0;
-  color: #1f2937;
-  font-size: 1.25rem;
-  font-weight: 600;
+  color: #333;
 }
 
 .close-btn {
@@ -1553,57 +1425,48 @@ onMounted(async () => {
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #6b7280;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: background 0.2s;
+  color: #666;
 }
 
-.close-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-/* Form Styles */
+/* Forms */
 .schedule-form,
-.document-form,
-.notification-form {
+.document-form {
   padding: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
 }
 
 .form-group label {
+  display: block;
   margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #374151;
-  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
 }
 
 .form-input,
+.form-select,
 .form-textarea {
+  width: 100%;
   padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   font-size: 1rem;
-  transition: border-color 0.2s;
 }
 
 .form-input:focus,
+.form-select:focus,
 .form-textarea:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
 }
 
 .form-textarea {
@@ -1611,171 +1474,139 @@ onMounted(async () => {
   min-height: 80px;
 }
 
-.checkbox-group {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: normal;
-  cursor: pointer;
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
 .form-actions {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  margin-top: 2rem;
 }
 
-.btn-primary {
-  background: #3b82f6;
+.cancel-btn,
+.submit-btn {
+  padding: 0.75rem 2rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.cancel-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.cancel-btn:hover {
+  background: #5a6268;
+}
+
+.submit-btn {
+  background: #007bff;
+  color: white;
+}
+
+.submit-btn:hover {
+  background: #0056b3;
+}
+
+/* Loading and Error States */
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.error-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.error-state h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.error-state p {
+  margin: 0 0 1.5rem 0;
+  color: #666;
+}
+
+.retry-btn {
+  background: #007bff;
   color: white;
   border: none;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 2rem;
   border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  font-weight: 600;
 }
 
-.btn-primary:hover {
-  background: #2563eb;
+.retry-btn:hover {
+  background: #0056b3;
 }
 
-.btn-secondary {
-  background: #6b7280;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-secondary:hover {
-  background: #4b5563;
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Mobile Responsive Styles */
 @media (max-width: 768px) {
-  .maintenance-system {
+  .desktop-header {
     padding: 1rem;
   }
 
-  .maintenance-header {
-    padding: 1.5rem;
+  .header-content h1 {
+    font-size: 1.5rem;
   }
 
-  .header-text h1 {
-    font-size: 2rem;
+  .tab-content {
+    padding: 1rem;
   }
 
-  .header-text p {
-    font-size: 1rem;
-  }
-
-  .stats-dashboard {
-    grid-template-columns: repeat(2, 1fr);
+  .dashboard-grid {
+    grid-template-columns: 1fr;
     gap: 1rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
   }
 
   .stat-card {
     padding: 1rem;
   }
 
-  .stat-content h3 {
+  .stat-value {
     font-size: 1.5rem;
   }
 
-  .tab-buttons {
-    flex-direction: column;
+  .stat-label {
+    font-size: 0.8rem;
   }
 
-  .tab-button {
-    justify-content: flex-start;
-    padding: 0.75rem 1rem;
-  }
-
-  .tab-content {
-    padding: 1.5rem;
-  }
-
-  .tab-header {
-    flex-direction: column;
+  .schedules-list {
+    grid-template-columns: 1fr;
     gap: 1rem;
-    align-items: flex-start;
   }
 
-  .filters-section {
-    flex-direction: column;
-  }
-
-  .filter-select {
-    min-width: auto;
-    width: 100%;
-  }
-
-  /* Show mobile cards, hide tables */
-  .desktop-view {
-    display: none;
-  }
-
-  .mobile-view {
-    display: block;
-  }
-
-  .card-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
-  }
-
-  .card-row strong {
-    min-width: auto;
-  }
-
-  .card-row span {
-    text-align: left;
-  }
-
-  .card-actions {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .btn-edit-mobile,
-  .btn-delete-mobile,
-  .btn-complete-mobile {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .notification-card {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: flex-start;
-  }
-
-  .notification-actions {
-    width: 100%;
-    justify-content: stretch;
+  .schedule-card,
+  .document-card {
+    padding: 1rem;
   }
 
   .modal-content {
@@ -1786,65 +1617,16 @@ onMounted(async () => {
 
   .form-row {
     grid-template-columns: 1fr;
-  }
-
-  .checkbox-group {
-    grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .form-actions {
     flex-direction: column;
   }
 
-  .btn-primary,
-  .btn-secondary {
+  .cancel-btn,
+  .submit-btn {
     width: 100%;
   }
 }
-
-@media (max-width: 480px) {
-  .maintenance-system {
-    padding: 0.5rem;
-  }
-
-  .maintenance-header {
-    padding: 1rem;
-    border-radius: 8px;
-  }
-
-  .header-content {
-    flex-direction: column;
-    text-align: center;
-    gap: 1rem;
-  }
-
-  .header-text h1 {
-    font-size: 1.5rem;
-  }
-
-  .stats-dashboard {
-    grid-template-columns: 1fr;
-  }
-
-  .stat-card {
-    padding: 0.75rem;
-  }
-
-  .stat-content h3 {
-    font-size: 1.25rem;
-  }
-
-  .tab-content {
-    padding: 1rem;
-  }
-
-  .schedule-card,
-  .document-card {
-    padding: 1rem;
-  }
-
-  .modal-content {
-    margin: 0.5rem;
-    width: calc(100vw - 1rem);
-  }
-}
+</style>
