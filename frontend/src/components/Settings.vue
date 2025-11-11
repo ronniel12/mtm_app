@@ -1053,6 +1053,8 @@ const getInitials = (name) => {
   gap: 0.5rem;
   margin-bottom: 2rem;
   border-bottom: 1px solid #dee2e6;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tab-btn {
@@ -1064,6 +1066,8 @@ const getInitials = (name) => {
   border-radius: 4px 4px 0 0;
   font-size: 0.9rem;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover {
@@ -2095,46 +2099,148 @@ const getInitials = (name) => {
   margin-left: 0.25rem;
 }
 
-/* Responsive */
+/* Mobile Responsiveness */
 @media (max-width: 768px) {
-  .employees-header {
+  .settings h3 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .settings-tabs {
+    gap: 0.25rem;
+    margin-bottom: 1.5rem;
+    padding: 0 0.5rem;
+  }
+
+  .tab-btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    min-width: 100px;
+    flex: 1;
+  }
+
+  .employees-header,
+  .vehicles-header {
     flex-direction: column;
     gap: 1.5rem;
     text-align: center;
+    padding: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title {
+    font-size: 1.4rem;
+  }
+
+  .section-subtitle {
+    font-size: 0.9rem;
   }
 
   .stats-cards {
-    justify-content: center;
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important; /* Stack vertically on mobile */
+    padding: 0.25rem !important;
+    box-sizing: border-box !important;
+  }
+
+  /* FORCE OVERRIDE: Stat cards must stack vertically and fit container - 50% SIZE */
+  .settings .vehicles-header .stats-cards .stat-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    flex: none !important;
+    display: block !important;
+    margin-bottom: 0.25rem !important;
+    padding: 0.25rem 0.15rem !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Last stat card should not have bottom margin */
+  .settings .vehicles-header .stats-cards .stat-card:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .stat-number {
+    font-size: 1.2rem;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
   }
 
   .header-right {
     align-items: center;
+    width: 100%;
   }
 
-  .employees-grid {
+  .btn-add-primary {
+    width: 100%;
+    justify-content: center;
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+  }
+
+  .employees-grid,
+  .vehicles-grid {
     grid-template-columns: 1fr;
-  }
-
-  .employee-header {
-    flex-direction: column;
-    text-align: center;
     gap: 1rem;
   }
 
-  .employee-meta {
+  .employee-card-modern,
+  .vehicle-card-modern {
+    margin-bottom: 1rem;
+  }
+
+  .employee-header,
+  .vehicle-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .employee-avatar,
+  .vehicle-icon {
+    width: 45px;
+    height: 45px;
+    margin: 0 auto;
+  }
+
+  .employee-name,
+  .vehicle-plate {
+    font-size: 1.1rem;
+  }
+
+  .employee-meta,
+  .vehicle-meta {
     justify-content: center;
+    gap: 0.75rem;
   }
 
-  .form-grid {
-    grid-template-columns: 1fr;
+  .meta-item {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.4rem;
   }
 
-  .form-actions-modern {
-    flex-direction: column;
+  .employee-actions,
+  .vehicle-actions {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    gap: 0.25rem;
   }
 
-  .financial-items {
-    flex-direction: column;
+  .btn-action {
+    width: 28px;
+    height: 28px;
+  }
+
+  .employee-details,
+  .vehicle-details {
+    padding: 1rem;
   }
 
   .detail-section,
@@ -2142,6 +2248,291 @@ const getInitials = (name) => {
   .financial-section {
     flex-direction: column;
     gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .detail-icon {
+    width: 20px;
+    font-size: 1rem;
+  }
+
+  .detail-label {
+    font-size: 0.75rem;
+  }
+
+  .detail-value {
+    font-size: 0.85rem;
+  }
+
+  .id-badges {
+    justify-content: center;
+  }
+
+  .id-badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .financial-items {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .financial-item {
+    min-width: auto;
+    padding: 0.6rem;
+  }
+
+  .amount {
+    font-size: 0.9rem;
+  }
+
+  .label {
+    font-size: 0.65rem;
+  }
+
+  /* Form Improvements */
+  .employee-form-container,
+  .vehicle-form-container {
+    margin: 0 0.5rem 1.5rem 0.5rem;
+  }
+
+  .form-header {
+    padding: 1.5rem;
+  }
+
+  .form-header h5 {
+    font-size: 1.2rem;
+  }
+
+  .form-header p {
+    font-size: 0.9rem;
+  }
+
+  .employee-form-modern,
+  .vehicle-form-modern {
+    padding: 1.5rem;
+  }
+
+  .form-card {
+    margin-bottom: 1rem;
+  }
+
+  .card-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .card-icon {
+    width: 35px;
+    height: 35px;
+    font-size: 1rem;
+  }
+
+  .card-title {
+    font-size: 1rem;
+  }
+
+  .card-content {
+    padding: 1rem;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .field-label {
+    font-size: 0.85rem;
+  }
+
+  .field-input {
+    padding: 0.7rem 0.9rem;
+    font-size: 0.9rem;
+  }
+
+  .field-helper {
+    margin-top: 0.2rem;
+  }
+
+  .checkbox-label-small {
+    font-size: 0.75rem;
+  }
+
+  .form-actions-modern {
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+  }
+
+  .btn-cancel-modern,
+  .btn-submit-modern {
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+    justify-content: center;
+  }
+
+  /* Rates Table Mobile */
+  .section-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+    margin-bottom: 1rem;
+  }
+
+  .section-header h4 {
+    font-size: 1.2rem;
+    text-align: center;
+  }
+
+  .btn-add {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .form-container {
+    padding: 1.5rem;
+    margin: 0 0.5rem 1.5rem 0.5rem;
+  }
+
+  .item-form {
+    gap: 1rem;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .form-group {
+    width: 100%;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .btn-cancel,
+  .btn-submit {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    font-size: 1rem;
+  }
+
+  .province-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .province-section h5 {
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .rates-table {
+    font-size: 0.8rem;
+    margin: 0.5rem 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rates-table th,
+  .rates-table td {
+    padding: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .rate-amount {
+    width: auto;
+    text-align: center;
+  }
+
+  .btn-edit-small,
+  .btn-delete-small {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+    margin: 0 0.1rem;
+  }
+
+  /* Modal Improvements */
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    margin: 1rem;
+  }
+
+  .modal-header {
+    padding: 1rem;
+  }
+
+  .modal-header h4 {
+    font-size: 1.1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+
+  /* Empty State */
+  .empty-state-modern {
+    padding: 2rem 1rem;
+    margin: 1rem 0.5rem;
+  }
+
+  .empty-icon {
+    font-size: 3rem;
+  }
+
+  .empty-state-modern h3 {
+    font-size: 1.2rem;
+  }
+
+  .empty-state-modern p {
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .btn-add-empty {
+    width: 100%;
+    justify-content: center;
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+  }
+
+  /* Touch-friendly improvements */
+  .btn-action,
+  .btn-edit,
+  .btn-delete {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .btn-attachment {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Better spacing for mobile */
+  .settings {
+    padding: 0.5rem;
+  }
+
+  .tab-content {
+    padding: 0.5rem 0;
+  }
+
+  .employees-content,
+  .vehicles-content {
+    padding: 0;
   }
 }
 
