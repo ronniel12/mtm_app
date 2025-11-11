@@ -1606,7 +1606,14 @@ app.delete('/api/vehicles/:id', async (req, res) => {
 app.get('/api/expenses', async (req, res) => {
   try {
     const result = await query('SELECT * FROM expenses ORDER BY created_at DESC');
-    res.json(result.rows);
+
+    // Transform dates to ensure they're returned in the user's local timezone
+    const transformedExpenses = result.rows.map(expense => ({
+      ...expense,
+      date: expense.date ? new Date(expense.date).toLocaleDateString('sv-SE') : null // YYYY-MM-DD format
+    }));
+
+    res.json(transformedExpenses);
   } catch (error) {
     console.error('Error fetching expenses:', error);
     res.status(500).json({ error: 'Failed to fetch expenses' });
@@ -1619,7 +1626,15 @@ app.get('/api/expenses/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Expense not found' });
     }
-    res.json(result.rows[0]);
+
+    // Transform date to ensure it's returned in the user's local timezone
+    const expense = result.rows[0];
+    const transformedExpense = {
+      ...expense,
+      date: expense.date ? new Date(expense.date).toLocaleDateString('sv-SE') : null // YYYY-MM-DD format
+    };
+
+    res.json(transformedExpense);
   } catch (error) {
     console.error('Error fetching expense:', error);
     res.status(500).json({ error: 'Failed to fetch expense' });

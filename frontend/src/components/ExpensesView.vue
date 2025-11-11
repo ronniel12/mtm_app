@@ -254,6 +254,21 @@
 
           <div class="form-group">
             <label>Receipt Attachment</label>
+
+            <!-- Show existing attachment when editing -->
+            <div v-if="editingExpense && existingAttachment" class="existing-attachment">
+              <div class="attachment-info">
+                <span class="attachment-label">Current attachment:</span>
+                <div class="attachment-display">
+                  <button @click="viewExistingAttachment" class="btn-attachment-view" title="View Current Receipt">
+                    📎 {{ getFileTypeIcon(existingAttachment.mimetype) }} {{ existingAttachment.originalName }}
+                  </button>
+                  <span class="file-info">{{ formatFileSize(existingAttachment.size) }}</span>
+                </div>
+              </div>
+              <small class="attachment-note">Upload a new file to replace the current attachment</small>
+            </div>
+
             <input
               type="file"
               @change="handleFileChange"
@@ -302,6 +317,7 @@ const editingExpense = ref(null)
 const selectedCategory = ref('')
 const selectedMonth = ref(new Date().toISOString().slice(0, 7)) // Current month
 const selectedFile = ref(null)
+const existingAttachment = ref(null)
 
 // Form data
 const expenseForm = ref({
@@ -427,10 +443,11 @@ const saveExpense = async () => {
     if (editingExpense.value) {
       // Update existing expense (without file support for now)
       const expenseData = { ...expenseForm.value }
-      await axios.put(`${API_BASE_URL}/expenses/${editingExpense.value.id}`, expenseData)
+      const response = await axios.put(`${API_BASE_URL}/expenses/${editingExpense.value.id}`, expenseData)
       const index = expenses.value.findIndex(e => e.id === editingExpense.value.id)
       if (index !== -1) {
-        expenses.value[index] = { ...expenseData, id: editingExpense.value.id }
+        // Use the response data which includes all fields including attachments
+        expenses.value[index] = response.data
       }
     } else {
       // Add new expense with file support
@@ -475,17 +492,44 @@ const saveExpense = async () => {
   }
 }
 
-const editExpense = (expense) => {
-  editingExpense.value = expense
-  expenseForm.value = {
-    date: expense.date ? new Date(expense.date).toISOString().split('T')[0] : '',
-    category: expense.category,
-    description: expense.description,
-    vehicle: expense.vehicle || '',
-    amount: expense.amount,
-    paymentMethod: expense.payment_method || expense.paymentMethod || 'cash',
-    notes: expense.notes || ''
+const editExpense = async (expense) => {
+  // Fetch fresh expense data by ID to ensure accuracy
+  const response = await axios.get(`${API_BASE_URL}/expenses/${expense.id}`)
+  const freshExpense = response.data
+
+  editingExpense.value = freshExpense
+
+  // Handle date parsing to avoid timezone issues
+  let dateValue = ''
+  if (freshExpense.date) {
+    // Parse the date string and extract just the date part without timezone conversion
+    const dateStr = freshExpense.date.split('T')[0] // Get YYYY-MM-DD part only
+    dateValue = dateStr
   }
+
+  expenseForm.value = {
+    date: dateValue,
+    category: freshExpense.category,
+    description: freshExpense.description,
+    vehicle: freshExpense.vehicle || '',
+    amount: freshExpense.amount,
+    paymentMethod: freshExpense.payment_method || freshExpense.paymentMethod || 'cash',
+    notes: freshExpense.notes || ''
+  }
+
+  // Handle existing attachment
+  if (freshExpense.receipt_filename) {
+    existingAttachment.value = {
+      filename: freshExpense.receipt_filename,
+      originalName: freshExpense.receipt_original_name,
+      mimetype: freshExpense.receipt_mimetype,
+      size: freshExpense.receipt_size
+    }
+  } else {
+    existingAttachment.value = null
+  }
+
+  selectedFile.value = null // Clear any new file selection
   showAddExpense.value = true
 }
 
@@ -549,6 +593,14 @@ const viewAttachment = (expense) => {
   if (expense.receipt_filename) {
     // Open file from database BLOB via API endpoint
     const fileUrl = `${API_BASE_URL}/expenses/${expense.id}/receipt`
+    window.open(fileUrl, '_blank')
+  }
+}
+
+const viewExistingAttachment = () => {
+  if (editingExpense.value && existingAttachment.value) {
+    // Open file from database BLOB via API endpoint
+    const fileUrl = `${API_BASE_URL}/expenses/${editingExpense.value.id}/receipt`
     window.open(fileUrl, '_blank')
   }
 }
@@ -948,6 +1000,58 @@ onMounted(() => {
 
 .file-remove:hover {
   background: #dc2626;
+}
+
+/* Existing Attachment Styles */
+.existing-attachment {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+}
+
+.attachment-info {
+  margin-bottom: 0.5rem;
+}
+
+.attachment-label {
+  font-weight: 600;
+  color: #0369a1;
+  font-size: 0.9rem;
+}
+
+.attachment-display {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.btn-attachment-view {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #0369a1;
+  background: #e0f2fe;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-attachment-view:hover {
+  background: #bae6fd;
+}
+
+.attachment-note {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 .form-actions {
