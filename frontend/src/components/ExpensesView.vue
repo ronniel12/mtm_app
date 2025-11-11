@@ -114,6 +114,62 @@
       </table>
     </div>
 
+    <!-- Mobile Card Layout -->
+    <div class="expenses-mobile-cards">
+      <div v-for="expense in filteredExpenses" :key="`mobile-${expense.id}`" class="expense-card">
+        <div class="card-header">
+          <div class="card-date">{{ formatDate(expense.date) }}</div>
+          <span class="category-badge" :class="`category-${expense.category}`">
+            {{ getCategoryLabel(expense.category) }}
+          </span>
+        </div>
+
+        <div class="card-content">
+          <div class="card-row">
+            <strong>Description:</strong>
+            <span>{{ expense.description }}</span>
+          </div>
+
+          <div class="card-row">
+            <strong>Vehicle:</strong>
+            <span>{{ expense.vehicle || 'N/A' }}</span>
+          </div>
+
+          <div class="card-row">
+            <strong>Amount:</strong>
+            <span class="amount-cell">{{ formatCurrency(expense.amount) }}</span>
+          </div>
+
+          <div v-if="expense.receipt_filename" class="card-row">
+            <strong>Attachment:</strong>
+            <div class="attachment-cell">
+              <button @click="viewAttachment(expense)" class="btn-attachment" title="View/Download Receipt">
+                📎 {{ getFileTypeIcon(expense.receipt_mimetype) }}
+              </button>
+              <span class="file-info">{{ formatFileSize(expense.receipt_size) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <button @click="editExpense(expense)" class="btn-edit-mobile">
+            <span class="btn-icon">✏️</span>
+            <span class="btn-text">Edit</span>
+          </button>
+          <button @click="deleteExpense(expense.id)" class="btn-delete-mobile">
+            <span class="btn-icon">🗑️</span>
+            <span class="btn-text">Delete</span>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="filteredExpenses.length === 0" class="empty-mobile">
+        <div class="empty-message">
+          No expenses found for the selected filters.
+        </div>
+      </div>
+    </div>
+
     <!-- Add/Edit Expense Modal -->
     <div v-if="showAddExpense || editingExpense" class="modal-overlay" @click="closeModal">
       <div class="modal-content" @click.stop>
@@ -925,6 +981,116 @@ onMounted(() => {
   background: #5a6268;
 }
 
+/* Mobile Card Layout */
+.expenses-mobile-cards {
+  display: none;
+}
+
+.expense-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.card-date {
+  font-weight: 600;
+  color: #374151;
+  font-size: 1rem;
+}
+
+.card-content {
+  margin-bottom: 1rem;
+}
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  gap: 1rem;
+}
+
+.card-row strong {
+  font-weight: 600;
+  color: #374151;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.card-row span {
+  color: #6b7280;
+  text-align: right;
+  flex: 1;
+  word-wrap: break-word;
+}
+
+.card-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.btn-edit-mobile, .btn-delete-mobile {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 80px;
+  justify-content: center;
+}
+
+.btn-edit-mobile {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.btn-edit-mobile:hover {
+  background: #bfdbfe;
+}
+
+.btn-delete-mobile {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.btn-delete-mobile:hover {
+  background: #fecaca;
+}
+
+.btn-icon {
+  font-size: 1rem;
+}
+
+.btn-text {
+  font-size: 0.85rem;
+}
+
+.empty-mobile {
+  text-align: center;
+  padding: 3rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 @media (max-width: 768px) {
   .form-row {
     grid-template-columns: 1fr;
@@ -947,6 +1113,50 @@ onMounted(() => {
 
   .filter-controls {
     flex-direction: column;
+  }
+
+  /* Hide table and show cards on mobile */
+  .expenses-table-container {
+    display: none;
+  }
+
+  .expenses-mobile-cards {
+    display: block;
+  }
+
+  /* Make buttons more touch-friendly on mobile */
+  .btn-edit-mobile, .btn-delete-mobile {
+    padding: 0.875rem 1.25rem;
+    font-size: 1rem;
+    min-width: 100px;
+  }
+
+  .btn-icon {
+    font-size: 1.2rem;
+  }
+
+  .btn-text {
+    font-size: 0.9rem;
+  }
+
+  /* Improve card spacing on mobile */
+  .expense-card {
+    padding: 1.25rem;
+  }
+
+  .card-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .card-row strong {
+    min-width: auto;
+    margin-bottom: 0.25rem;
+  }
+
+  .card-row span {
+    text-align: left;
   }
 }
 </style>
