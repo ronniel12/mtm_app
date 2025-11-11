@@ -52,11 +52,11 @@ const toggleForm = () => {
 const onTripAdded = () => {
   showForm.value = false
   editTrip.value = null
-  // Refresh the trip list directly
-  if (tripListRef.value && tripListRef.value.fetchTrips) {
-    tripListRef.value.fetchTrips()
-  }
+  // Force refresh by incrementing the key
+  refreshKey.value++
   fetchDashboardData()
+  // Directly refresh the trip list to ensure immediate UI update
+  tripListRef.value?.fetchTrips()
 }
 
 const onTripEdit = (trip) => {
