@@ -449,6 +449,11 @@ const deleteTrip = async (tripId) => {
     }
 }
 
+const resetToPage1 = () => {
+  console.log('🔄 TripList: Resetting to page 1')
+  currentPage.value = 1
+}
+
 const formatDate = (dateString) => {
   if (!dateString) return ''
   // Database now stores timestamps in local timezone (UTC+2)
@@ -653,7 +658,8 @@ const getFarmData = (farmName) => {
 // Clean up unused functions - calculations now handled in calculateRatesForTrips
 
 defineExpose({
-  fetchTrips
+  fetchTrips,
+  resetToPage1
 })
 </script>
 

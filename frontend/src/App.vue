@@ -55,41 +55,36 @@ const onTripAdded = async () => {
   showForm.value = false
   editTrip.value = null
 
-  // Force refresh by incrementing the key
+  // Force refresh by incrementing the key - this forces TripList re-mount
   refreshKey.value++
+  console.log('🔄 Forced TripList re-mount with key:', refreshKey.value)
 
   try {
-    // Refresh dashboard data
+    // Refresh dashboard data first
     await fetchDashboardData()
     console.log('✅ Dashboard data refreshed')
 
-    // Directly refresh the trip list with retry logic
+    // Small delay to ensure component has re-mounted
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Reset to page 1 to ensure new trip is visible
+    if (tripListRef.value && typeof tripListRef.value.resetToPage1 === 'function') {
+      tripListRef.value.resetToPage1()
+      console.log('✅ Trip list reset to page 1')
+    }
+
+    // Force another refresh after page reset
     if (tripListRef.value?.fetchTrips) {
       await tripListRef.value.fetchTrips()
-      console.log('✅ Trip list refreshed successfully')
+      console.log('✅ Trip list refreshed successfully after page reset')
     } else {
-      console.warn('⚠️ TripList ref not available, retrying in 500ms...')
-      // Retry after a short delay if ref isn't ready
-      setTimeout(async () => {
-        if (tripListRef.value?.fetchTrips) {
-          await tripListRef.value.fetchTrips()
-          console.log('✅ Trip list refreshed on retry')
-        } else {
-          console.error('❌ TripList ref still not available after retry')
-        }
-      }, 500)
+      console.warn('⚠️ TripList ref not available after re-mount')
     }
   } catch (error) {
     console.error('❌ Error refreshing data after trip operation:', error)
-    // Still try to refresh trip list even if dashboard fails
-    try {
-      if (tripListRef.value?.fetchTrips) {
-        await tripListRef.value.fetchTrips()
-        console.log('✅ Trip list refreshed despite dashboard error')
-      }
-    } catch (tripError) {
-      console.error('❌ Trip list refresh also failed:', tripError)
-    }
+    // Force refresh even on error
+    refreshKey.value++
+    console.log('🔄 Forced refresh on error')
   }
 }
 
