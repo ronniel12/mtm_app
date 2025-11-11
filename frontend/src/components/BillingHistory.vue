@@ -963,18 +963,26 @@ onMounted(async () => {
 
 .trips-table-container {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  max-width: 100%;
 }
 
 .trips-table {
-  width: 100%;
+  width: auto !important; /* Allow table to expand based on content */
+  min-width: 100%; /* Ensure at least container width */
   border-collapse: collapse;
   font-size: 0.875rem;
+  table-layout: auto !important; /* Override global fixed layout */
+  margin: 0 auto; /* Center the table */
 }
 
 .trips-table th,
 .trips-table td {
   border: 1px solid #e5e7eb;
   padding: 0.75rem;
+  white-space: nowrap;
 }
 
 .trips-table th {
@@ -986,6 +994,118 @@ onMounted(async () => {
 .trips-table .totals-row {
   background: #f3f4f6;
   font-weight: bold;
+}
+
+/* Mobile Table Column Widths */
+@media (max-width: 768px) {
+  .trips-table-container {
+    margin: 1rem 0;
+  }
+
+  .trips-table {
+    font-size: 0.7rem;
+    min-width: 100%;
+  }
+
+  .trips-table th,
+  .trips-table td {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.7rem;
+  }
+
+  /* Auto-adjusting Column Widths */
+  .trips-table th:nth-child(1),
+  .trips-table td:nth-child(1) { /* Date */
+    width: auto;
+    min-width: 100px;
+  }
+
+  .trips-table th:nth-child(2),
+  .trips-table td:nth-child(2) { /* Plate */
+    width: auto;
+    min-width: 120px;
+  }
+
+  .trips-table th:nth-child(3),
+  .trips-table td:nth-child(3) { /* Invoice */
+    width: auto;
+    min-width: 140px;
+  }
+
+  .trips-table th:nth-child(4),
+  .trips-table td:nth-child(4) { /* Destination */
+    width: auto;
+    min-width: 250px;
+    white-space: normal;
+    word-wrap: break-word;
+  }
+
+  .trips-table th:nth-child(5),
+  .trips-table td:nth-child(5) { /* Bags */
+    width: auto;
+    min-width: 80px;
+  }
+
+  .trips-table th:nth-child(6),
+  .trips-table td:nth-child(6) { /* Rate */
+    width: auto;
+    min-width: 100px;
+  }
+
+  .trips-table th:nth-child(7),
+  .trips-table td:nth-child(7) { /* Total */
+    width: auto;
+    min-width: 110px;
+  }
+}
+
+@media (max-width: 480px) {
+  .trips-table {
+    font-size: 0.65rem;
+    min-width: 700px;
+  }
+
+  .trips-table th,
+  .trips-table td {
+    padding: 0.4rem 0.2rem;
+    font-size: 0.65rem;
+  }
+
+  /* Smaller minimum widths for very small screens */
+  .trips-table th:nth-child(1),
+  .trips-table td:nth-child(1) { /* Date */
+    min-width: 70px;
+  }
+
+  .trips-table th:nth-child(2),
+  .trips-table td:nth-child(2) { /* Plate */
+    min-width: 80px;
+  }
+
+  .trips-table th:nth-child(3),
+  .trips-table td:nth-child(3) { /* Invoice */
+    min-width: 100px;
+  }
+
+  .trips-table th:nth-child(4),
+  .trips-table td:nth-child(4) { /* Destination */
+    min-width: 180px;
+  }
+
+  .trips-table th:nth-child(5),
+  .trips-table td:nth-child(5) { /* Bags */
+    min-width: 50px;
+  }
+
+  .trips-table th:nth-child(6),
+  .trips-table td:nth-child(6) { /* Rate */
+    min-width: 70px;
+  }
+
+  .trips-table th:nth-child(7),
+  .trips-table td:nth-child(7) { /* Total */
+    min-width: 80px;
+  }
 }
 
 .modal-footer {

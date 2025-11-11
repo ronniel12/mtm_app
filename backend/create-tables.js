@@ -71,6 +71,8 @@ async function createTables() {
         period_end DATE,
         client_name TEXT,
         client_address TEXT,
+        client_city TEXT,
+        client_zip_code VARCHAR(10),
         client_tin VARCHAR(20),
         trips JSONB,
         totals JSONB,
@@ -80,6 +82,15 @@ async function createTables() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Add missing columns to existing billings table
+    try {
+      await query(`ALTER TABLE billings ADD COLUMN IF NOT EXISTS client_city TEXT`);
+      await query(`ALTER TABLE billings ADD COLUMN IF NOT EXISTS client_zip_code VARCHAR(10)`);
+      console.log('✅ Added missing client_city and client_zip_code columns to billings table');
+    } catch (error) {
+      console.log('ℹ️ Columns may already exist or error adding them:', error.message);
+    }
 
     // Create payslips table
     await query(`

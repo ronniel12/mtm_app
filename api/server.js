@@ -1330,8 +1330,8 @@ app.get('/api/billings', async (req, res) => {
       client: {
         name: billing.client_name,
         address: billing.client_address,
-        city: billing.client_address ? billing.client_address.split(',')[0] : '',
-        zipCode: billing.client_address ? billing.client_address.split(',').pop().trim() : '',
+        city: billing.client_city || '',
+        zipCode: billing.client_zip_code || '',
         tin: billing.client_tin
       },
       // Transform payment status
@@ -1412,8 +1412,8 @@ app.post('/api/billings', jsonParser, async (req, res) => {
     }
 
     const result = await query(`
-      INSERT INTO billings (id, billing_number, period_start, period_end, client_name, client_address, client_tin, trips, totals, prepared_by, payment_status, created_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      INSERT INTO billings (id, billing_number, period_start, period_end, client_name, client_address, client_city, client_zip_code, client_tin, trips, totals, prepared_by, payment_status, created_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *
     `, [
       body.id || Date.now().toString(),
@@ -1422,6 +1422,8 @@ app.post('/api/billings', jsonParser, async (req, res) => {
       body.period?.endDate,
       body.client?.name,
       body.client?.address,
+      body.client?.city,
+      body.client?.zipCode,
       body.client?.tin,
       JSON.stringify(body.trips || []),
       JSON.stringify(body.totals || {}),
@@ -1438,16 +1440,10 @@ app.post('/api/billings', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/api/billings/:id', async (req, res) => {
+app.put('/api/billings/:id', jsonParser, async (req, res) => {
   try {
-    // Parse JSON body manually to avoid middleware conflicts
-    let body;
-    try {
-      body = JSON.parse(req.body);
-    } catch (parseError) {
-      // If req.body is already parsed, use it directly
-      body = req.body;
-    }
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
 
     // Transform frontend format to database format
     const billingData = {
@@ -1456,6 +1452,8 @@ app.put('/api/billings/:id', async (req, res) => {
       period_end: body.period?.endDate,
       client_name: body.client?.name,
       client_address: body.client?.address,
+      client_city: body.client?.city,
+      client_zip_code: body.client?.zipCode,
       client_tin: body.client?.tin,
       trips: body.trips || [],
       totals: body.totals || {},
@@ -1466,9 +1464,9 @@ app.put('/api/billings/:id', async (req, res) => {
     const result = await query(`
       UPDATE billings
       SET billing_number = $1, period_start = $2, period_end = $3, client_name = $4,
-          client_address = $5, client_tin = $6, trips = $7, totals = $8,
-          prepared_by = $9, payment_status = $10, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $11
+          client_address = $5, client_city = $6, client_zip_code = $7, client_tin = $8,
+          trips = $9, totals = $10, prepared_by = $11, payment_status = $12, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $13
       RETURNING *
     `, [
       billingData.billing_number,
@@ -1476,6 +1474,8 @@ app.put('/api/billings/:id', async (req, res) => {
       billingData.period_end,
       billingData.client_name,
       billingData.client_address,
+      billingData.client_city,
+      billingData.client_zip_code,
       billingData.client_tin,
       JSON.stringify(billingData.trips),
       JSON.stringify(billingData.totals),

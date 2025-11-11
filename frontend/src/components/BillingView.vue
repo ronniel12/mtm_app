@@ -1125,9 +1125,225 @@ onMounted(() => {
   background: #f5f5f5;
 }
 
+/* Mobile Responsive Design */
+@media (max-width: 768px) {
+  .billing-statement {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .filters-section {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+  }
+
+  .date-filters {
+    gap: 1rem;
+  }
+
+  .filter-group {
+    flex: 1;
+  }
+
+  .date-input {
+    width: 100%;
+    font-size: 0.9rem;
+  }
+
+  .company-header {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .company-info-centered {
+    gap: 0.5rem;
+  }
+
+  .company-logo-large {
+    width: 80px;
+    height: 80px;
+  }
+
+  .company-name-small {
+    font-size: 1.2rem;
+  }
+
+  .company-details-small {
+    font-size: 0.7rem;
+  }
+
+  .billing-statement-title {
+    font-size: 1rem;
+  }
+
+  .billed-to-left {
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .billed-to-label-small {
+    min-width: 60px;
+    font-size: 0.8rem;
+  }
+
+  .billed-to-info-small {
+    font-size: 0.75rem;
+  }
+
+  .period-billing-section {
+    margin-bottom: 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  /* Horizontal Scrolling Table Container */
+  .billing-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    max-width: 100%;
+  }
+
+  .billing-table {
+    width: auto; /* Allow table to expand freely based on content */
+    min-width: 100%; /* Ensure at least container width */
+    font-size: 0.7rem;
+    border: 1px solid #000;
+    table-layout: auto !important; /* Override global fixed layout */
+    margin: 0 auto; /* Center the table */
+  }
+
+  .billing-table .header-row th {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.65rem;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+
+  /* Header Column Widths - Match data column widths */
+  .header-row .date-col { width: auto; min-width: 100px; }
+  .header-row .plate-col { width: auto; min-width: 120px; }
+  .header-row .invoice-col { width: auto; min-width: 140px; }
+  .header-row .destination-col { width: auto; min-width: 250px; }
+  .header-row .bags-col { width: auto; min-width: 80px; }
+  .header-row .rate-col { width: auto; min-width: 100px; }
+  .header-row .total-col { width: auto; min-width: 110px; }
+
+  .billing-table .data-row td {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  /* Auto-adjusting Column Widths with generous minimums */
+  .date-col { width: auto; min-width: 100px; }
+  .plate-col { width: auto; min-width: 120px; }
+  .invoice-col { width: auto; min-width: 140px; }
+  .destination-col {
+    width: auto;
+    min-width: 250px; /* Increased significantly for long destination names */
+    white-space: normal; /* Allow wrapping for very long destinations */
+    word-wrap: break-word;
+  }
+  .bags-col { width: auto; min-width: 80px; }
+  .rate-col { width: auto; min-width: 100px; }
+  .total-col { width: auto; min-width: 110px; }
+
+  /* Totals Row */
+  .totals-row {
+    font-size: 0.75rem;
+  }
+
+  .totals-row td {
+    padding: 0.75rem 0.25rem;
+  }
+
+  .prepared-by-section {
+    margin-bottom: 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .billing-controls {
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+  }
+
+  .btn {
+    padding: 0.6rem 1.5rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Extra Small Mobile Devices */
+@media (max-width: 480px) {
+  .billing-statement {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .filters-section {
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .company-logo-large {
+    width: 60px;
+    height: 60px;
+  }
+
+  .company-name-small {
+    font-size: 1rem;
+  }
+
+  .billing-statement-title {
+    font-size: 0.9rem;
+  }
+
+  .billing-table-container {
+    border-radius: 4px;
+  }
+
+  .billing-table {
+    min-width: 700px; /* Slightly narrower for very small screens */
+    font-size: 0.65rem;
+    table-layout: auto; /* Allow columns to auto-size based on content */
+  }
+
+  .billing-table .header-row th {
+    padding: 0.4rem 0.2rem;
+    font-size: 0.6rem;
+    white-space: nowrap;
+  }
+
+  .billing-table .data-row td {
+    padding: 0.4rem 0.2rem;
+    font-size: 0.65rem;
+    white-space: nowrap;
+  }
+
+  /* Auto-adjusting Column Widths for small screens */
+  .date-col { width: auto; min-width: 70px; }
+  .plate-col { width: auto; min-width: 80px; }
+  .invoice-col { width: auto; min-width: 100px; }
+  .destination-col { width: auto; min-width: 180px; }
+  .bags-col { width: auto; min-width: 50px; }
+  .rate-col { width: auto; min-width: 70px; }
+  .total-col { width: auto; min-width: 80px; }
+
+  .totals-row {
+    font-size: 0.7rem;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+}
+
 /* Print Styles */
 @media print {
-  .billing-sheet {
+  .billing-statement {
     max-width: none;
     margin: 0;
     padding: 1rem;
@@ -1137,11 +1353,12 @@ onMounted(() => {
     display: none;
   }
 
-  .company-name {
-    font-size: 2rem;
+  .billing-table-container {
+    overflow: visible;
   }
 
-  .ledger-table {
+  .billing-table {
+    min-width: auto;
     font-size: 0.75rem;
   }
 
@@ -1149,56 +1366,5 @@ onMounted(() => {
   .data-row td {
     padding: 0.5rem 0.25rem;
   }
-}
-
-@media (max-width: 768px) {
-  .billing-sheet {
-    padding: 1rem;
-    font-size: 0.8rem;
-  }
-
-  .company-header {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .invoice-header {
-    text-align: left;
-  }
-
-  .billing-footer {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .payment-instructions {
-    text-align: left;
-  }
-
-  .billing-controls {
-    flex-direction: column;
-  }
-
-  .btn {
-    width: 100%;
-  }
-
-  .ledger-table {
-    font-size: 0.75rem;
-  }
-
-  .header-row th,
-  .data-row td {
-    padding: 0.5rem 0.25rem;
-  }
-
-  .date-col { width: 15%; }
-  .invoice-col { width: 18%; }
-  .description-col { width: 25%; }
-  .destination-col { width: auto; display: none; } /* Hide on very small screens */
-  .qty-col { width: 10%; }
-  .rate-col { width: 12%; }
-  .amount-col { width: 15%; }
-  .actions-col { width: 5%; }
 }
 </style>
