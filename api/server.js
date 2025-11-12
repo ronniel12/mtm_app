@@ -1534,7 +1534,7 @@ app.get('/api/vehicles/:id', async (req, res) => {
   }
 });
 
-app.post('/api/vehicles', async (req, res) => {
+app.post('/api/vehicles', jsonParser, async (req, res) => {
   try {
     const result = await query(`
       INSERT INTO vehicles (plate_number, vehicle_class, name, created_at, updated_at)
@@ -1599,6 +1599,79 @@ app.delete('/api/vehicles/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting vehicle:', error);
     res.status(500).json({ error: 'Failed to delete vehicle' });
+  }
+});
+
+// Rates API endpoints
+app.post('/api/rates', jsonParser, async (req, res) => {
+  try {
+    const result = await query(`
+      INSERT INTO rates (origin, province, town, rate, new_rates, created_at)
+      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+      RETURNING *
+    `, [
+      req.body.origin,
+      req.body.province,
+      req.body.town,
+      req.body.rate || 0,
+      req.body.newRates || req.body.rate || 0
+    ]);
+
+    console.log('Created new rate:', req.body.origin, req.body.province, req.body.town);
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating rate:', error);
+    res.status(500).json({ error: 'Failed to create rate' });
+  }
+});
+
+app.put('/api/rates/:origin/:province/:town', jsonParser, async (req, res) => {
+  try {
+    const { originalOrigin, originalProvince, originalTown, ...updateData } = req.body;
+
+    const result = await query(`
+      UPDATE rates
+      SET origin = $1, province = $2, town = $3, rate = $4, new_rates = $5, updated_at = CURRENT_TIMESTAMP
+      WHERE origin = $6 AND province = $7 AND town = $8
+      RETURNING *
+    `, [
+      updateData.origin || req.body.origin,
+      updateData.province || req.body.province,
+      updateData.town || req.body.town,
+      updateData.rate || updateData.newRates || 0,
+      updateData.newRates || updateData.rate || 0,
+      req.params.origin,
+      req.params.province,
+      req.params.town
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Rate not found' });
+    }
+
+    console.log('Updated rate:', req.params.origin, req.params.province, req.params.town);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating rate:', error);
+    res.status(500).json({ error: 'Failed to update rate' });
+  }
+});
+
+app.delete('/api/rates/:origin/:province/:town', async (req, res) => {
+  try {
+    const result = await query('DELETE FROM rates WHERE origin = $1 AND province = $2 AND town = $3 RETURNING *', [
+      req.params.origin,
+      req.params.province,
+      req.params.town
+    ]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Rate not found' });
+    }
+    console.log('Deleted rate:', req.params.origin, req.params.province, req.params.town);
+    res.json({ message: 'Rate deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting rate:', error);
+    res.status(500).json({ error: 'Failed to delete rate' });
   }
 });
 
@@ -1839,6 +1912,524 @@ app.post('/api/maintenance/schedules', jsonParser, async (req, res) => {
     const result = await query(`
       INSERT INTO maintenance_schedules (
         vehicle_id, maintenance_type, category, schedule_type, frequency_value, frequency_unit,
+        reminder_days, last_completed_date, last_mileage_serviced, next_due_date, next_due_mileage, status, notes
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING *
+    `, [
+      body.vehicleId,
+      body.maintenanceType,
+      body.category,
+      body.scheduleType,
+      body.frequencyValue,
+      body.frequencyUnit,
+      body.reminderDays || 7,
+      body.lastCompletedDate,
+      body.lastMileageServiced,
+      nextDueDate?.toISOString().split('T')[0],
+      nextDueMileage,
+      body.status || 'active',
+      body.notes
+    ]);
+
+    console.log('Created maintenance schedule:', body.maintenanceType);
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating maintenance schedule:', error);
+    res.status(500).json({ error: 'Failed to create maintenance schedule' });
+  }
+});
+
+app.put('/api/maintenance/schedules/:id', jsonParser, async (req, res) => {
+  try {
+    const body = req.body;
+
+    // Build dynamic update query - only update fields that are provided
+    const updateFields = [];
+    const values = [];
+    let paramCount = 1;
+
+    // Build dynamic update query
+    Object.keys(body).forEach(key => {
+      if (body[key] !== undefined) {
+        // Convert camelCase to snake_case for database columns
+        const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+        updateFields.push(`${dbKey} = $${paramCount}`);
+        values.push(body[key]);
+        paramCount++;
+      }
+    });
+
+    // Always update the updated_at timestamp
+    updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    values.push(parseInt(req.params.id)); // Add ID at the end
+
+    const result = await query(`
+      UPDATE maintenance_schedules
+      SET ${updateFields.join(', ')}
+      WHERE id = $${paramCount}
+      RETURNING *
+    `, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Maintenance schedule not found' });
+    }
+
+    console.log('Updated maintenance schedule:', result.rows[0].maintenance_type);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating maintenance schedule:', error);
+    res.status(500).json({ error: 'Failed to update maintenance schedule' });
+  }
+});
+
+app.delete('/api/maintenance/schedules/:id', async (req, res) => {
+  try {
+    const result = await query('DELETE FROM maintenance_schedules WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Maintenance schedule not found' });
+    }
+    console.log('Deleted maintenance schedule:', result.rows[0].maintenance_type);
+    res.json({ message: 'Maintenance schedule deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting maintenance schedule:', error);
+    res.status(500).json({ error: 'Failed to delete maintenance schedule' });
+  }
+});
+
+// Vehicle Documents API endpoints
+app.get('/api/maintenance/documents', async (req, res) => {
+  try {
+    const { vehicle_id, document_type } = req.query;
+    let queryStr = 'SELECT * FROM vehicle_documents WHERE 1=1';
+    const params = [];
+    let paramCount = 1;
+
+    if (vehicle_id) {
+      queryStr += ` AND vehicle_id = $${paramCount}`;
+      params.push(parseInt(vehicle_id));
+      paramCount++;
+    }
+
+    if (document_type) {
+      queryStr += ` AND document_type = $${paramCount}`;
+      params.push(document_type);
+      paramCount++;
+    }
+
+    queryStr += ' ORDER BY expiry_date ASC, created_at DESC';
+
+    const result = await query(queryStr, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching vehicle documents:', error);
+    res.status(500).json({ error: 'Failed to fetch vehicle documents' });
+  }
+});
+
+app.get('/api/maintenance/documents/:id', async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM vehicle_documents WHERE id = $1', [parseInt(req.params.id)]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Vehicle document not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching vehicle document:', error);
+    res.status(500).json({ error: 'Failed to fetch vehicle document' });
+  }
+});
+
+app.post('/api/maintenance/documents', jsonParser, async (req, res) => {
+  try {
+    const body = req.body;
+
+    const result = await query(`
+      INSERT INTO vehicle_documents (
+        vehicle_id, document_type, document_number, issue_date, expiry_date,
+        issuing_authority, cost, document_file_path, notes
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *
+    `, [
+      body.vehicleId,
+      body.documentType,
+      body.documentNumber,
+      body.issueDate,
+      body.expiryDate,
+      body.issuingAuthority,
+      body.cost ? parseFloat(body.cost) : null,
+      body.documentFilePath,
+      body.notes
+    ]);
+
+    console.log('Created vehicle document:', body.documentType);
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating vehicle document:', error);
+    res.status(500).json({ error: 'Failed to create vehicle document' });
+  }
+});
+
+app.put('/api/maintenance/documents/:id', jsonParser, async (req, res) => {
+  try {
+    const body = req.body;
+
+    const result = await query(`
+      UPDATE vehicle_documents
+      SET vehicle_id = $1, document_type = $2, document_number = $3, issue_date = $4,
+          expiry_date = $5, issuing_authority = $6, cost = $7, document_file_path = $8,
+          notes = $9, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $10
+      RETURNING *
+    `, [
+      body.vehicleId,
+      body.documentType,
+      body.documentNumber,
+      body.issueDate,
+      body.expiryDate,
+      body.issuingAuthority,
+      body.cost ? parseFloat(body.cost) : null,
+      body.documentFilePath,
+      body.notes,
+      parseInt(req.params.id)
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Vehicle document not found' });
+    }
+
+    console.log('Updated vehicle document:', body.documentType);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating vehicle document:', error);
+    res.status(500).json({ error: 'Failed to update vehicle document' });
+  }
+});
+
+app.delete('/api/maintenance/documents/:id', async (req, res) => {
+  try {
+    const result = await query('DELETE FROM vehicle_documents WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Vehicle document not found' });
+    }
+    console.log('Deleted vehicle document:', result.rows[0].document_type);
+    res.json({ message: 'Vehicle document deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting vehicle document:', error);
+    res.status(500).json({ error: 'Failed to delete vehicle document' });
+  }
+});
+
+// Notification Preferences API endpoints
+app.get('/api/maintenance/notifications/preferences', async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM notification_preferences WHERE is_active = true ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching notification preferences:', error);
+    res.status(500).json({ error: 'Failed to fetch notification preferences' });
+  }
+});
+
+app.post('/api/maintenance/notifications/preferences', jsonParser, async (req, res) => {
+  try {
+    const body = req.body;
+
+    const result = await query(`
+      INSERT INTO notification_preferences (
+        user_id, maintenance_type, reminder_days, notification_methods, is_active
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [
+      body.userId,
+      body.maintenanceType,
+      body.reminderDays || 7,
+      JSON.stringify(body.notificationMethods || ['in_app']),
+      body.isActive !== false
+    ]);
+
+    console.log('Created notification preference:', body.maintenanceType);
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating notification preference:', error);
+    res.status(500).json({ error: 'Failed to create notification preference' });
+  }
+});
+
+app.put('/api/maintenance/notifications/preferences/:id', jsonParser, async (req, res) => {
+  try {
+    const body = req.body;
+
+    const result = await query(`
+      UPDATE notification_preferences
+      SET user_id = $1, maintenance_type = $2, reminder_days = $3,
+          notification_methods = $4, is_active = $5, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $6
+      RETURNING *
+    `, [
+      body.userId,
+      body.maintenanceType,
+      body.reminderDays || 7,
+      JSON.stringify(body.notificationMethods || ['in_app']),
+      body.isActive !== false,
+      parseInt(req.params.id)
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Notification preference not found' });
+    }
+
+    console.log('Updated notification preference:', body.maintenanceType);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating notification preference:', error);
+    res.status(500).json({ error: 'Failed to update notification preference' });
+  }
+});
+
+// Notification History API endpoints
+app.get('/api/maintenance/notifications/history', async (req, res) => {
+  try {
+    const { vehicle_id, status, limit = 50 } = req.query;
+    let queryStr = 'SELECT * FROM notification_history WHERE 1=1';
+    const params = [];
+    let paramCount = 1;
+
+    if (vehicle_id) {
+      queryStr += ` AND vehicle_id = $${paramCount}`;
+      params.push(parseInt(vehicle_id));
+      paramCount++;
+    }
+
+    if (status) {
+      queryStr += ` AND status = $${paramCount}`;
+      params.push(status);
+      paramCount++;
+    }
+
+    queryStr += ` ORDER BY sent_at DESC LIMIT $${paramCount}`;
+    params.push(parseInt(limit));
+
+    const result = await query(queryStr, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching notification history:', error);
+    res.status(500).json({ error: 'Failed to fetch notification history' });
+  }
+});
+
+// User Contacts API endpoints
+app.get('/api/maintenance/contacts', async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM user_contacts WHERE verified = true ORDER BY is_primary DESC, created_at DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching user contacts:', error);
+    res.status(500).json({ error: 'Failed to fetch user contacts' });
+  }
+});
+
+app.post('/api/maintenance/contacts', jsonParser, async (req, res) => {
+  try {
+    const body = req.body;
+
+    const result = await query(`
+      INSERT INTO user_contacts (
+        user_id, contact_type, contact_value, is_primary, verified, verification_code
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [
+      body.userId,
+      body.contactType,
+      body.contactValue,
+      body.isPrimary || false,
+      body.verified || false,
+      body.verificationCode || Math.random().toString(36).substring(2, 8).toUpperCase()
+    ]);
+
+    console.log('Created user contact:', body.contactType);
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating user contact:', error);
+    res.status(500).json({ error: 'Failed to create user contact' });
+  }
+});
+
+app.put('/api/maintenance/contacts/:id', jsonParser, async (req, res) => {
+  try {
+    const body = req.body;
+
+    const result = await query(`
+      UPDATE user_contacts
+      SET user_id = $1, contact_type = $2, contact_value = $3, is_primary = $4,
+          verified = $5, last_used = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $6
+      RETURNING *
+    `, [
+      body.userId,
+      body.contactType,
+      body.contactValue,
+      body.isPrimary || false,
+      body.verified || false,
+      parseInt(req.params.id)
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User contact not found' });
+    }
+
+    console.log('Updated user contact:', body.contactType);
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating user contact:', error);
+    res.status(500).json({ error: 'Failed to update user contact' });
+  }
+});
+
+// Maintenance Dashboard API endpoint
+app.get('/api/maintenance/dashboard', async (req, res) => {
+  try {
+    // Get maintenance statistics
+    const statsQuery = `
+      SELECT
+        COUNT(*) as total_schedules,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_schedules,
+        COUNT(CASE WHEN next_due_date <= CURRENT_DATE + INTERVAL '7 days' AND status = 'active' THEN 1 END) as due_soon,
+        COUNT(CASE WHEN next_due_date < CURRENT_DATE AND status = 'active' THEN 1 END) as overdue,
+        COUNT(CASE WHEN last_completed_date >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as completed_this_month
+      FROM maintenance_schedules
+    `;
+
+    const statsResult = await query(statsQuery);
+    const stats = statsResult.rows[0];
+
+    // Get upcoming maintenance (next 30 days)
+    const upcomingQuery = `
+      SELECT ms.*, v.plate_number, v.name as vehicle_name
+      FROM maintenance_schedules ms
+      JOIN vehicles v ON ms.vehicle_id = v.id
+      WHERE ms.status = 'active'
+        AND ms.next_due_date <= CURRENT_DATE + INTERVAL '30 days'
+      ORDER BY ms.next_due_date ASC
+      LIMIT 10
+    `;
+
+    const upcomingResult = await query(upcomingQuery);
+
+    // Get expiring documents (next 30 days)
+    const expiringQuery = `
+      SELECT vd.*, v.plate_number, v.name as vehicle_name
+      FROM vehicle_documents vd
+      JOIN vehicles v ON vd.vehicle_id = v.id
+      WHERE vd.expiry_date <= CURRENT_DATE + INTERVAL '30 days'
+      ORDER BY vd.expiry_date ASC
+      LIMIT 10
+    `;
+
+    const expiringResult = await query(expiringQuery);
+
+    res.json({
+      stats: {
+        totalSchedules: parseInt(stats.total_schedules),
+        activeSchedules: parseInt(stats.active_schedules),
+        dueSoon: parseInt(stats.due_soon),
+        overdue: parseInt(stats.overdue),
+        completedThisMonth: parseInt(stats.completed_this_month)
+      },
+      upcomingMaintenance: upcomingResult.rows,
+      expiringDocuments: expiringResult.rows
+    });
+  } catch (error) {
+    console.error('Error fetching maintenance dashboard:', error);
+    res.status(500).json({ error: 'Failed to fetch maintenance dashboard' });
+  }
+});
+
+// ============================================================================
+// MAINTENANCE SYSTEM API ENDPOINTS
+// ============================================================================
+
+// Maintenance Schedules API endpoints
+app.get('/api/maintenance/schedules', async (req, res) => {
+  try {
+    const { vehicle_id, status, category } = req.query;
+    let queryStr = 'SELECT * FROM maintenance_schedules WHERE 1=1';
+    const params = [];
+    let paramCount = 1;
+
+    if (vehicle_id) {
+      queryStr += ` AND vehicle_id = $${paramCount}`;
+      params.push(parseInt(vehicle_id));
+      paramCount++;
+    }
+
+    if (status) {
+      queryStr += ` AND status = $${paramCount}`;
+      params.push(status);
+      paramCount++;
+    }
+
+    if (category) {
+      queryStr += ` AND category = $${paramCount}`;
+      params.push(category);
+      paramCount++;
+    }
+
+    queryStr += ' ORDER BY next_due_date ASC, created_at DESC';
+
+    const result = await query(queryStr, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching maintenance schedules:', error);
+    res.status(500).json({ error: 'Failed to fetch maintenance schedules' });
+  }
+});
+
+app.get('/api/maintenance/schedules/:id', async (req, res) => {
+  try {
+    const result = await query('SELECT * FROM maintenance_schedules WHERE id = $1', [parseInt(req.params.id)]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Maintenance schedule not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching maintenance schedule:', error);
+    res.status(500).json({ error: 'Failed to fetch maintenance schedule' });
+  }
+});
+
+app.post('/api/maintenance/schedules', jsonParser, async (req, res) => {
+  try {
+    const body = req.body;
+
+    // Calculate next due date based on schedule type
+    let nextDueDate = null;
+    let nextDueMileage = null;
+
+    if (body.scheduleType === 'time_based') {
+      const now = new Date();
+      if (body.frequencyUnit === 'days') {
+        nextDueDate = new Date(now.getTime() + (body.frequencyValue * 24 * 60 * 60 * 1000));
+      } else if (body.frequencyUnit === 'weeks') {
+        nextDueDate = new Date(now.getTime() + (body.frequencyValue * 7 * 24 * 60 * 60 * 1000));
+      } else if (body.frequencyUnit === 'months') {
+        nextDueDate = new Date(now.getFullYear(), now.getMonth() + body.frequencyValue, now.getDate());
+      } else if (body.frequencyUnit === 'years') {
+        nextDueDate = new Date(now.getFullYear() + body.frequencyValue, now.getMonth(), now.getDate());
+      }
+    }
+
+    const result = await query(`
+      INSERT INTO maintenance_schedules (
+        vehicle_id, maintenance_type, category, schedule_type, frequency_value, frequency_unit,
         reminder_days, last_completed_date, next_due_date, next_due_mileage, status, notes
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -1874,9 +2465,9 @@ app.put('/api/maintenance/schedules/:id', jsonParser, async (req, res) => {
       UPDATE maintenance_schedules
       SET vehicle_id = $1, maintenance_type = $2, category = $3, schedule_type = $4,
           frequency_value = $5, frequency_unit = $6, reminder_days = $7,
-          last_completed_date = $8, next_due_date = $9, next_due_mileage = $10,
-          status = $11, notes = $12, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $13
+          last_completed_date = $8, last_mileage_serviced = $9, next_due_date = $10, next_due_mileage = $11,
+          status = $12, notes = $13, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $14
       RETURNING *
     `, [
       body.vehicleId,
@@ -1887,6 +2478,7 @@ app.put('/api/maintenance/schedules/:id', jsonParser, async (req, res) => {
       body.frequencyUnit,
       body.reminderDays || 7,
       body.lastCompletedDate,
+      body.lastMileageServiced,
       body.nextDueDate,
       body.nextDueMileage,
       body.status || 'active',

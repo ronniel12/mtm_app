@@ -2,10 +2,11 @@
 // Centralized API base URL configuration for easy maintenance and scaling
 
 // In production (Vercel), use relative API path
-// In development, use localhost or configured URL
+// In development (Vercel dev), use relative API path
+// In local development, use localhost or configured URL
 export const API_BASE_URL = import.meta.env.PROD
   ? '/api'  // Production: relative path to Vercel domain
-  : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api')  // Development: localhost
+  : (import.meta.env.VITE_API_BASE_URL || '/api')  // Development: relative path for Vercel dev
 
 // API endpoints
 export const API_ENDPOINTS = {

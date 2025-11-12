@@ -177,6 +177,7 @@ async function createTables() {
         frequency_unit VARCHAR(20) NOT NULL, -- days, weeks, months, years, km, miles
         reminder_days INTEGER DEFAULT 7,
         last_completed_date DATE,
+        last_mileage_serviced INTEGER,
         next_due_date DATE,
         next_due_mileage INTEGER,
         status VARCHAR(20) DEFAULT 'active', -- active, paused, completed
@@ -185,6 +186,14 @@ async function createTables() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Add missing columns to existing maintenance_schedules table
+    try {
+      await query(`ALTER TABLE maintenance_schedules ADD COLUMN IF NOT EXISTS last_mileage_serviced INTEGER`);
+      console.log('✅ Added missing last_mileage_serviced column to maintenance_schedules table');
+    } catch (error) {
+      console.log('ℹ️ Column may already exist or error adding it:', error.message);
+    }
 
     // Create vehicle_documents table
     await query(`

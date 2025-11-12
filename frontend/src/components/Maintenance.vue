@@ -214,11 +214,19 @@
               </div>
               <div class="detail-item">
                 <span class="label">Next Due:</span>
-                <span class="value">{{ formatDate(schedule.next_due_date) }}</span>
+                <span class="value">
+                  {{ schedule.schedule_type === 'mileage_based'
+                     ? (schedule.next_due_mileage ? schedule.next_due_mileage + ' km' : 'N/A')
+                     : formatDate(schedule.next_due_date) }}
+                </span>
               </div>
               <div class="detail-item">
                 <span class="label">Reminder:</span>
-                <span class="value">{{ schedule.reminder_days }} days before</span>
+                <span class="value">
+                  {{ schedule.schedule_type === 'mileage_based'
+                     ? `${schedule.reminder_days} km before`
+                     : `${schedule.reminder_days} days before` }}
+                </span>
               </div>
             </div>
             <div class="schedule-actions">
@@ -365,9 +373,19 @@
             <div class="form-group">
               <label>Category *</label>
               <select v-model="scheduleForm.category" required class="form-select">
-                <option value="preventive">Preventive</option>
-                <option value="documentation">Documentation</option>
+                <option value="engine">Engine</option>
+                <option value="fuel_system">Fuel System</option>
+                <option value="air_intake">Air Intake</option>
+                <option value="transmission">Transmission</option>
+                <option value="drivetrain">Drivetrain</option>
+                <option value="cooling">Cooling System</option>
+                <option value="brakes">Brakes</option>
+                <option value="steering">Steering & Suspension</option>
+                <option value="electrical">Electrical</option>
+                <option value="tires">Tires & Wheels</option>
+                <option value="preventive">Preventive Maintenance</option>
                 <option value="safety">Safety</option>
+                <option value="documentation">Documentation</option>
               </select>
             </div>
             <div class="form-group">
@@ -386,22 +404,28 @@
             <div class="form-group">
               <label>Frequency Unit *</label>
               <select v-model="scheduleForm.frequencyUnit" required class="form-select">
-                <option value="days">Days</option>
-                <option value="weeks">Weeks</option>
-                <option value="months">Months</option>
-                <option value="years">Years</option>
-                <option value="km">Kilometers</option>
-                <option value="miles">Miles</option>
+                <!-- Time-based units -->
+                <option v-if="scheduleForm.scheduleType === 'time_based'" value="days">Days</option>
+                <option v-if="scheduleForm.scheduleType === 'time_based'" value="weeks">Weeks</option>
+                <option v-if="scheduleForm.scheduleType === 'time_based'" value="months">Months</option>
+                <option v-if="scheduleForm.scheduleType === 'time_based'" value="years">Years</option>
+                <!-- Mileage-based units -->
+                <option v-if="scheduleForm.scheduleType === 'mileage_based'" value="km">Kilometers</option>
+                <option v-if="scheduleForm.scheduleType === 'mileage_based'" value="miles">Miles</option>
               </select>
             </div>
           </div>
           <div class="form-group">
-            <label>Reminder Days Before</label>
-            <input v-model.number="scheduleForm.reminderDays" type="number" min="0" max="30" class="form-input" />
+            <label>{{ scheduleForm.scheduleType === 'mileage_based' ? 'Reminder Distance Before (km)' : 'Reminder Days Before' }}</label>
+            <input v-model.number="scheduleForm.reminderDays" type="number" :min="0" :max="scheduleForm.scheduleType === 'mileage_based' ? 10000 : 30" class="form-input" :placeholder="scheduleForm.scheduleType === 'mileage_based' ? 'e.g., 500' : 'e.g., 7'" />
           </div>
-          <div class="form-group">
+          <div class="form-group" v-if="scheduleForm.scheduleType === 'time_based'">
             <label>Last Completed Date</label>
             <input v-model="scheduleForm.lastCompletedDate" type="date" class="form-input" />
+          </div>
+          <div class="form-group" v-if="scheduleForm.scheduleType === 'mileage_based'">
+            <label>Last Mileage Serviced (km) *</label>
+            <input v-model.number="scheduleForm.lastMileageServiced" type="number" min="0" class="form-input" placeholder="e.g., 50000" />
           </div>
           <div class="form-group">
             <label>Notes</label>
@@ -412,6 +436,38 @@
             <button type="submit" class="submit-btn">Save Schedule</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Mileage Input Dialog -->
+    <div v-if="showMileageDialog" class="modal-overlay" @click="closeMileageDialog">
+      <div class="modal-content small-modal" @click.stop>
+        <div class="modal-header">
+          <h3>Enter Current Mileage</h3>
+          <button @click="closeMileageDialog" class="close-btn">✕</button>
+        </div>
+        <div class="mileage-dialog">
+          <p class="dialog-description">
+            Please enter the current mileage for <strong>{{ completingSchedule?.maintenance_type }}</strong> on <strong>{{ getVehicleName(completingSchedule?.vehicle_id) }}</strong>.
+          </p>
+          <div class="form-group">
+            <label>Current Mileage (km) *</label>
+            <input
+              v-model.number="currentMileageInput"
+              type="number"
+              min="0"
+              step="0.1"
+              required
+              class="form-input"
+              placeholder="e.g., 50000"
+              @keyup.enter="confirmMileageCompletion"
+            />
+          </div>
+          <div class="form-actions">
+            <button type="button" @click="closeMileageDialog" class="cancel-btn">Cancel</button>
+            <button type="button" @click="confirmMileageCompletion" class="submit-btn">Mark Complete</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -501,8 +557,10 @@ const vehicles = ref([])
 // Forms
 const showScheduleForm = ref(false)
 const showDocumentForm = ref(false)
+const showMileageDialog = ref(false)
 const editingSchedule = ref(null)
 const editingDocument = ref(null)
+const completingSchedule = ref(null)
 
 // Form data
 const scheduleForm = ref({
@@ -514,6 +572,7 @@ const scheduleForm = ref({
   frequencyUnit: 'months',
   reminderDays: 7,
   lastCompletedDate: '',
+  lastMileageServiced: null,
   notes: ''
 })
 
@@ -535,6 +594,9 @@ const settings = ref({
   enableEmail: false
 })
 
+// Mileage input
+const currentMileageInput = ref(null)
+
 // Tabs configuration
 const tabs = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊' },
@@ -542,6 +604,15 @@ const tabs = [
   { key: 'documents', label: 'Documents', icon: '📄' },
   { key: 'settings', label: 'Settings', icon: '⚙️' }
 ]
+
+// Watchers for form consistency
+const updateFrequencyUnit = () => {
+  if (scheduleForm.value.scheduleType === 'time_based' && !['days', 'weeks', 'months', 'years'].includes(scheduleForm.value.frequencyUnit)) {
+    scheduleForm.value.frequencyUnit = 'months'
+  } else if (scheduleForm.value.scheduleType === 'mileage_based' && !['km', 'miles'].includes(scheduleForm.value.frequencyUnit)) {
+    scheduleForm.value.frequencyUnit = 'km'
+  }
+}
 
 // Methods
 const toggleMobileMenu = () => {
@@ -588,16 +659,83 @@ const loadAllData = async () => {
 
 // Schedule methods
 const markCompleted = async (schedule) => {
+  if (schedule.schedule_type === 'mileage_based') {
+    // For mileage-based schedules, show dialog to input current mileage
+    completingSchedule.value = schedule
+    currentMileageInput.value = null
+    showMileageDialog.value = true
+  } else {
+    // For time-based schedules, complete immediately
+    await completeTimeBasedSchedule(schedule)
+  }
+}
+
+const completeTimeBasedSchedule = async (schedule) => {
   try {
     const today = new Date().toISOString().split('T')[0]
-    await axios.put(`${API_BASE_URL}/maintenance/schedules/${schedule.id}`, {
-      lastCompletedDate: today,
-      status: 'active'
-    })
+    const updateData = {
+      status: 'active',
+      lastCompletedDate: today
+    }
+
+    // Calculate next due date based on frequency
+    const lastDate = new Date(today)
+    let nextDueDate
+
+    if (schedule.frequency_unit === 'days') {
+      nextDueDate = new Date(lastDate.getTime() + (schedule.frequency_value * 24 * 60 * 60 * 1000))
+    } else if (schedule.frequency_unit === 'weeks') {
+      nextDueDate = new Date(lastDate.getTime() + (schedule.frequency_value * 7 * 24 * 60 * 60 * 1000))
+    } else if (schedule.frequency_unit === 'months') {
+      nextDueDate = new Date(lastDate.getFullYear(), lastDate.getMonth() + schedule.frequency_value, lastDate.getDate())
+    } else if (schedule.frequency_unit === 'years') {
+      nextDueDate = new Date(lastDate.getFullYear() + schedule.frequency_value, lastDate.getMonth(), lastDate.getDate())
+    }
+
+    updateData.nextDueDate = nextDueDate.toISOString().split('T')[0]
+
+    await axios.put(`${API_BASE_URL}/maintenance/schedules/${schedule.id}`, updateData)
     await loadAllData()
+    alert(`✅ Maintenance schedule "${schedule.maintenance_type}" marked as completed successfully!`)
   } catch (err) {
     console.error('Error marking schedule complete:', err)
+    alert(`❌ Failed to mark schedule as completed: ${err.response?.data?.error || err.message}`)
   }
+}
+
+const confirmMileageCompletion = async () => {
+  if (!currentMileageInput.value || currentMileageInput.value <= 0) {
+    alert('❌ Please enter a valid current mileage.')
+    return
+  }
+
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const schedule = completingSchedule.value
+    const updateData = {
+      status: 'active',
+      lastCompletedDate: today,
+      lastMileageServiced: currentMileageInput.value
+    }
+
+    // Calculate next due mileage based on frequency
+    const nextDueMileage = currentMileageInput.value + schedule.frequency_value
+    updateData.nextDueMileage = nextDueMileage
+
+    await axios.put(`${API_BASE_URL}/maintenance/schedules/${schedule.id}`, updateData)
+    await loadAllData()
+    closeMileageDialog()
+    alert(`✅ Maintenance schedule "${schedule.maintenance_type}" marked as completed successfully!`)
+  } catch (err) {
+    console.error('Error marking schedule complete:', err)
+    alert(`❌ Failed to mark schedule as completed: ${err.response?.data?.error || err.message}`)
+  }
+}
+
+const closeMileageDialog = () => {
+  showMileageDialog.value = false
+  completingSchedule.value = null
+  currentMileageInput.value = null
 }
 
 const editSchedule = (schedule) => {
@@ -611,6 +749,7 @@ const editSchedule = (schedule) => {
     frequencyUnit: schedule.frequency_unit,
     reminderDays: schedule.reminder_days,
     lastCompletedDate: schedule.last_completed_date,
+    lastMileageServiced: schedule.last_mileage_serviced,
     notes: schedule.notes
   }
   showScheduleForm.value = true
@@ -621,8 +760,10 @@ const deleteSchedule = async (schedule) => {
     try {
       await axios.delete(`${API_BASE_URL}/maintenance/schedules/${schedule.id}`)
       await loadAllData()
+      alert(`✅ Maintenance schedule "${schedule.maintenance_type}" deleted successfully!`)
     } catch (err) {
       console.error('Error deleting schedule:', err)
+      alert(`❌ Failed to delete schedule: ${err.response?.data?.error || err.message}`)
     }
   }
 }
@@ -633,14 +774,17 @@ const saveSchedule = async () => {
 
     if (editingSchedule.value) {
       await axios.put(`${API_BASE_URL}/maintenance/schedules/${editingSchedule.value.id}`, data)
+      alert(`✅ Maintenance schedule "${scheduleForm.value.maintenanceType}" updated successfully!`)
     } else {
       await axios.post(`${API_BASE_URL}/maintenance/schedules`, data)
+      alert(`✅ Maintenance schedule "${scheduleForm.value.maintenanceType}" created successfully!`)
     }
 
     closeScheduleForm()
     await loadAllData()
   } catch (err) {
     console.error('Error saving schedule:', err)
+    alert(`❌ Failed to save schedule: ${err.response?.data?.error || err.message}`)
   }
 }
 
@@ -656,6 +800,7 @@ const closeScheduleForm = () => {
     frequencyUnit: 'months',
     reminderDays: 7,
     lastCompletedDate: '',
+    lastMileageServiced: null,
     notes: ''
   }
 }
@@ -681,8 +826,10 @@ const deleteDocument = async (document) => {
     try {
       await axios.delete(`${API_BASE_URL}/maintenance/documents/${document.id}`)
       await loadAllData()
+      alert(`✅ Document "${document.document_type}" deleted successfully!`)
     } catch (err) {
       console.error('Error deleting document:', err)
+      alert(`❌ Failed to delete document: ${err.response?.data?.error || err.message}`)
     }
   }
 }
@@ -693,14 +840,17 @@ const saveDocument = async () => {
 
     if (editingDocument.value) {
       await axios.put(`${API_BASE_URL}/maintenance/documents/${editingDocument.value.id}`, data)
+      alert(`✅ Document "${documentForm.value.documentType}" updated successfully!`)
     } else {
       await axios.post(`${API_BASE_URL}/maintenance/documents`, data)
+      alert(`✅ Document "${documentForm.value.documentType}" created successfully!`)
     }
 
     closeDocumentForm()
     await loadAllData()
   } catch (err) {
     console.error('Error saving document:', err)
+    alert(`❌ Failed to save document: ${err.response?.data?.error || err.message}`)
   }
 }
 
@@ -733,9 +883,10 @@ const saveSettings = async () => {
       ].filter(Boolean)
     })
 
-    alert('Settings saved successfully!')
+    alert('✅ Settings saved successfully!')
   } catch (err) {
     console.error('Error saving settings:', err)
+    alert(`❌ Failed to save settings: ${err.response?.data?.error || err.message}`)
   }
 }
 
@@ -1405,6 +1556,20 @@ const onUnmounted = () => {
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+.modal-content.small-modal {
+  max-width: 400px;
+}
+
+.mileage-dialog {
+  padding: 1.5rem;
+}
+
+.dialog-description {
+  margin-bottom: 1.5rem;
+  color: #666;
+  line-height: 1.5;
 }
 
 .modal-header {
