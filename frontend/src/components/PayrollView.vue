@@ -588,30 +588,14 @@ const filteredEmployeeTrips = computed(() => {
     return []
   }
 
-  // Normalize dates to avoid timezone issues - compare only date parts
-  const startDateObj = new Date(startDate.value)
-  const endDateObj = new Date(endDate.value)
+  const start = new Date(startDate.value)
+  const end = new Date(endDate.value)
+  end.setHours(23, 59, 59, 999)
 
   // First, filter trips where employee participated
   const participatingTrips = trips.value.filter(trip => {
-    const tripDateObj = new Date(trip.date)
-
-    // Compare date parts only (year, month, day) to avoid timezone issues
-    const tripYear = tripDateObj.getFullYear()
-    const tripMonth = tripDateObj.getMonth()
-    const tripDay = tripDateObj.getDate()
-
-    const startYear = startDateObj.getFullYear()
-    const startMonth = startDateObj.getMonth()
-    const startDay = startDateObj.getDate()
-
-    const endYear = endDateObj.getFullYear()
-    const endMonth = endDateObj.getMonth()
-    const endDay = endDateObj.getDate()
-
-    const isInDateRange = (tripYear > startYear || (tripYear === startYear && (tripMonth > startMonth || (tripMonth === startMonth && tripDay >= startDay)))) &&
-                          (tripYear < endYear || (tripYear === endYear && (tripMonth < endMonth || (tripMonth === endMonth && tripDay <= endDay))))
-
+    const tripDate = new Date(trip.date)
+    const isInDateRange = tripDate >= start && tripDate <= end
     const isCompleted = trip.status === 'Completed'
 
     // Check if the employee participated in this trip (either as driver or helper)
@@ -1407,8 +1391,11 @@ const savePayslip = async () => {
 
 const fetchPayrollData = async () => {
   try {
+    // Use wide date range to get all trips (like billing view but for all data)
+    const queryParams = `startDate=1900-01-01&endDate=2100-12-31&limit=all&_t=${Date.now()}`
+
     const [tripsRes, employeesRes, ratesRes, deductionsRes] = await Promise.all([
-      axios.get(`${API_BASE_URL}/trips?limit=all`),
+      axios.get(`${API_BASE_URL}/trips?${queryParams}`),
       axios.get(`${API_BASE_URL}/employees`),
       axios.get(`${API_BASE_URL}/rates`),
       axios.get(`${API_BASE_URL}/deductions`)
