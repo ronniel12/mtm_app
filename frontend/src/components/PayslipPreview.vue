@@ -41,7 +41,8 @@
 
     <!-- Payroll Table -->
     <div class="payroll-table-container">
-      <table class="payroll-table">
+      <div class="table-scroll-wrapper">
+        <table class="payroll-table">
         <thead>
           <tr class="header-row">
             <th class="date-col">DATE</th>
@@ -122,6 +123,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- Prepared by Section -->
@@ -268,11 +270,19 @@ const formatCurrency = (amount) => {
   page-break-inside: avoid;
 }
 
+.table-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .payroll-table {
-  width: 100%;
+  width: auto !important; /* Allow table to expand based on content */
+  min-width: 100%; /* Ensure at least container width */
   border-collapse: collapse;
   font-size: 0.65rem;
   border: 1px solid #000;
+  table-layout: auto !important; /* Override global fixed layout */
+  margin: 0 auto; /* Center the table */
 }
 
 .payroll-table .header-row th {
@@ -534,13 +544,61 @@ const formatCurrency = (amount) => {
     padding: 0.5rem 0.25rem;
   }
 
-  .date-col { width: 15%; }
-  .invoice-col { width: 18%; }
-  .description-col { width: 25%; }
-  .destination-col { width: auto; display: none; } /* Hide on very small screens */
-  .qty-col { width: 10%; }
-  .rate-col { width: 12%; }
-  .amount-col { width: 15%; }
-  .actions-col { width: 5%; }
+  /* Mobile Table Column Widths - Auto-adjusting like BillingHistory */
+  .payroll-table {
+    font-size: 0.7rem;
+    min-width: 100%;
+  }
+
+  .payroll-table .header-row th,
+  .payroll-table .data-row td {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.7rem;
+  }
+
+  /* Auto-adjusting Column Widths */
+  .payroll-table .header-row th:nth-child(1),
+  .payroll-table .data-row td:nth-child(1) { /* Date */
+    width: auto;
+    min-width: 100px;
+  }
+
+  .payroll-table .header-row th:nth-child(2),
+  .payroll-table .data-row td:nth-child(2) { /* Plate */
+    width: auto;
+    min-width: 120px;
+  }
+
+  .payroll-table .header-row th:nth-child(3),
+  .payroll-table .data-row td:nth-child(3) { /* Invoice */
+    width: auto;
+    min-width: 140px;
+  }
+
+  .payroll-table .header-row th:nth-child(4),
+  .payroll-table .data-row td:nth-child(4) { /* Destination */
+    width: auto;
+    min-width: 250px;
+    white-space: normal;
+    word-wrap: break-word;
+  }
+
+  .payroll-table .header-row th:nth-child(5),
+  .payroll-table .data-row td:nth-child(5) { /* Bags */
+    width: auto;
+    min-width: 80px;
+  }
+
+  .payroll-table .header-row th:nth-child(6),
+  .payroll-table .data-row td:nth-child(6) { /* Rate */
+    width: auto;
+    min-width: 100px;
+  }
+
+  .payroll-table .header-row th:nth-child(7),
+  .payroll-table .data-row td:nth-child(7) { /* Total */
+    width: auto;
+    min-width: 110px;
+  }
 }
 </style>

@@ -173,6 +173,14 @@
         <div class="modal-body">
           <PayslipPreview :payslip="selectedPayslip" />
         </div>
+
+        <div class="modal-footer">
+          <button @click="printPayslip(selectedPayslip)" class="btn btn-primary">Print</button>
+          <button @click="togglePayslipStatus(selectedPayslip)" class="btn" :class="selectedPayslip.status === 'approved' ? 'btn-secondary' : 'btn-success'">
+            {{ selectedPayslip.status === 'approved' ? 'Mark as Pending' : 'Mark as Approved' }}
+          </button>
+          <button @click="closeViewModal" class="btn btn-secondary">Close</button>
+        </div>
       </div>
     </div>
 
@@ -281,6 +289,9 @@ const processedPayslips = computed(() => {
       period,
       trips,
       deductions,
+      // Ensure payslip number fields are available for editing
+      payslip_number: payslip.payslip_number || payslip.payslipNumber,
+      payslipNumber: payslip.payslip_number || payslip.payslipNumber,
       // Computed display properties
       displayNumber: payslip.payslip_number || payslip.payslipNumber,
       displayEmployeeName: employee?.name || '',
@@ -420,7 +431,13 @@ const closeViewModal = () => {
 }
 
 const editPayslip = (payslip) => {
-  selectedPayslip.value = payslip
+  // Ensure payslip number is available for editing
+  const payslipWithNumber = {
+    ...payslip,
+    payslip_number: payslip.payslip_number || payslip.payslipNumber || payslip.displayNumber,
+    payslipNumber: payslip.payslip_number || payslip.payslipNumber || payslip.displayNumber
+  }
+  selectedPayslip.value = payslipWithNumber
   editModalOpen.value = true
 }
 
@@ -593,6 +610,49 @@ const generateNewPayslipNumber = async () => {
   } catch (error) {
     const currentYear = new Date().getFullYear()
     return `PAY-${currentYear}-001`
+  }
+}
+
+const togglePayslipStatus = async (payslip) => {
+  const newStatus = payslip.status === 'approved' ? 'pending' : 'approved'
+
+  try {
+    // Try to update via API first
+    const response = await axios.put(`${API_BASE_URL}/payslips/${payslip.id}`, {
+      ...payslip,
+      status: newStatus
+    })
+
+    if (response.status === 200) {
+      // Update local data
+      payslip.status = newStatus
+
+      console.log('Updated payslip status:', payslip.id, newStatus)
+      alert(`Payslip ${payslip.displayNumber} marked as ${newStatus === 'approved' ? 'Approved' : 'Pending'}`)
+      return
+    }
+
+  } catch (apiError) {
+    console.warn('API update failed, using localStorage:', apiError.message)
+  }
+
+  // Fallback: Update in localStorage
+  try {
+    payslip.status = newStatus
+    const savedPayslips = JSON.stringify(allPayslips.value)
+    localStorage.setItem('payslips', savedPayslips)
+
+    console.log('Updated payslip status locally:', payslip.id, newStatus)
+    alert(`Payslip ${payslip.displayNumber} marked as ${newStatus === 'approved' ? 'Approved' : 'Pending'} (stored locally)`)
+
+  } catch (localError) {
+    console.error('Local storage update failed:', localError)
+    alert('Status update failed completely. Please try again.')
+  }
+
+  // Close modal if open
+  if (selectedPayslip.value) {
+    selectedPayslip.value.status = newStatus
   }
 }
 
@@ -991,6 +1051,81 @@ onMounted(() => {
   padding: 1.5rem;
   max-height: 80vh;
   overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.modal-footer .btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+/* Custom button styles for modal footer */
+.modal-footer .btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.modal-footer .btn-primary:hover {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.modal-footer .btn-success {
+  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+}
+
+.modal-footer .btn-success:hover {
+  background: linear-gradient(135deg, #43a047 0%, #3d8b40 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+}
+
+.modal-footer .btn-secondary {
+  background: linear-gradient(135deg, #757575 0%, #616161 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(117, 117, 117, 0.4);
+}
+
+.modal-footer .btn-secondary:hover {
+  background: linear-gradient(135deg, #6d6d6d 0%, #575757 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(117, 117, 117, 0.6);
+}
+
+/* Mobile responsive button styles */
+@media (max-width: 768px) {
+  .modal-footer .btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+    min-width: 100px;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+    min-width: unset;
+  }
 }
 
 @media (max-width: 768px) {

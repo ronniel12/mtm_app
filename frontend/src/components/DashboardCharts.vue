@@ -62,7 +62,7 @@
       <div class="charts-section">
         <!-- Monthly Trips Chart -->
         <div class="chart-card">
-          <h3>📈 Monthly Trip Performance</h3>
+          <h3>📈 {{ tripChartTitle }}</h3>
           <div class="chart-container">
             <Line :data="monthlyTripsData" :options="lineOptions" />
           </div>
@@ -78,7 +78,7 @@
 
         <!-- Revenue Chart -->
         <div class="chart-card">
-          <h3>💰 Monthly Revenue</h3>
+          <h3>💰 {{ revenueChartTitle }}</h3>
           <div class="chart-container">
             <Line :data="revenueData" :options="revenueOptions" />
           </div>
@@ -181,7 +181,12 @@ const getDateRange = (filter) => {
 
   switch (filter) {
     case 'weekly':
-      startDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
+      // Calculate Monday of current week
+      const dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1 // Days to subtract to get to Monday
+      startDate = new Date(now)
+      startDate.setDate(now.getDate() - daysToSubtract)
+      startDate.setHours(0, 0, 0, 0) // Set to start of Monday
       break
     case 'monthly':
       startDate = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -228,6 +233,24 @@ const revenueLabel = computed(() => {
   }
 })
 
+const tripChartTitle = computed(() => {
+  switch (filterPeriod.value) {
+    case 'weekly': return 'Daily Trip Performance'
+    case 'monthly': return 'Daily Trip Performance'
+    case 'yearly': return 'Monthly Trip Performance'
+    default: return 'Monthly Trip Performance'
+  }
+})
+
+const revenueChartTitle = computed(() => {
+  switch (filterPeriod.value) {
+    case 'weekly': return 'Daily Revenue'
+    case 'monthly': return 'Daily Revenue'
+    case 'yearly': return 'Monthly Revenue'
+    default: return 'Monthly Revenue'
+  }
+})
+
 const updateFilter = () => {
   // Just updates the computed properties
 }
@@ -237,21 +260,37 @@ const recentTripsData = computed(() => {
 })
 
 const monthlyTripsData = computed(() => {
-  const months = {}
-  props.trips.forEach(trip => {
+  const isDaily = filterPeriod.value === 'weekly' || filterPeriod.value === 'monthly'
+  const data = {}
+
+  filteredTrips.value.forEach(trip => {
     const date = new Date(trip.date)
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    months[monthKey] = (months[monthKey] || 0) + 1
+    let key
+
+    if (isDaily) {
+      // Group by day for weekly/monthly filters
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    } else {
+      // Group by month for all/yearly filters
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    }
+
+    data[key] = (data[key] || 0) + 1
   })
 
   return {
-    labels: Object.keys(months).sort().map(key => {
-      const [year, month] = key.split('-')
-      return new Date(year, month - 1).toLocaleString('default', { month: 'short', year: 'numeric' })
+    labels: Object.keys(data).sort().map(key => {
+      if (isDaily) {
+        const [year, month, day] = key.split('-')
+        return new Date(year, month - 1, day).toLocaleString('default', { month: 'short', day: 'numeric' })
+      } else {
+        const [year, month] = key.split('-')
+        return new Date(year, month - 1).toLocaleString('default', { month: 'short', year: 'numeric' })
+      }
     }),
     datasets: [{
       label: 'Trips',
-      data: Object.keys(months).sort().map(key => months[key]),
+      data: Object.keys(data).sort().map(key => data[key]),
       borderColor: '#667eea',
       backgroundColor: 'rgba(102, 126, 234, 0.1)',
       fill: true,
@@ -262,7 +301,7 @@ const monthlyTripsData = computed(() => {
 
 const destinationData = computed(() => {
   const destinations = {}
-  props.trips.forEach(trip => {
+  filteredTrips.value.forEach(trip => {
     const dest = trip.destination || 'Unknown'
     destinations[dest] = (destinations[dest] || 0) + 1
   })
@@ -293,22 +332,38 @@ const destinationData = computed(() => {
 })
 
 const revenueData = computed(() => {
-  const months = {}
-  props.trips.forEach(trip => {
+  const isDaily = filterPeriod.value === 'weekly' || filterPeriod.value === 'monthly'
+  const data = {}
+
+  filteredTrips.value.forEach(trip => {
     const date = new Date(trip.date)
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    let key
+
+    if (isDaily) {
+      // Group by day for weekly/monthly filters
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    } else {
+      // Group by month for all/yearly filters
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    }
+
     const revenue = trip._total || 0
-    months[monthKey] = (months[monthKey] || 0) + revenue
+    data[key] = (data[key] || 0) + revenue
   })
 
   return {
-    labels: Object.keys(months).sort().map(key => {
-      const [year, month] = key.split('-')
-      return new Date(year, month - 1).toLocaleString('default', { month: 'short', year: 'numeric' })
+    labels: Object.keys(data).sort().map(key => {
+      if (isDaily) {
+        const [year, month, day] = key.split('-')
+        return new Date(year, month - 1, day).toLocaleString('default', { month: 'short', day: 'numeric' })
+      } else {
+        const [year, month] = key.split('-')
+        return new Date(year, month - 1).toLocaleString('default', { month: 'short', year: 'numeric' })
+      }
     }),
     datasets: [{
       label: 'Revenue (₱)',
-      data: Object.keys(months).sort().map(key => months[key]),
+      data: Object.keys(data).sort().map(key => data[key]),
       borderColor: '#27ae60',
       backgroundColor: 'rgba(39, 174, 96, 0.1)',
       fill: true,
@@ -319,7 +374,7 @@ const revenueData = computed(() => {
 
 const truckPerformanceData = computed(() => {
   const trucks = {}
-  props.trips.forEach(trip => {
+  filteredTrips.value.forEach(trip => {
     const truck = trip.truckPlate || 'Unknown'
     trucks[truck] = (trucks[truck] || 0) + 1
   })

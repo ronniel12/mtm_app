@@ -245,11 +245,12 @@ app.get('/api/trips', async (req, res) => {
   }
 });
 
-// Optimized trips endpoint with pre-calculated rates
+// Optimized trips endpoint with pre-calculated rates and search
 app.get('/api/trips/calculated', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limitParam = req.query.limit;
+    const searchQuery = req.query.search ? req.query.search.trim() : '';
     let limit, offset;
 
     if (limitParam === 'all') {
@@ -260,16 +261,44 @@ app.get('/api/trips/calculated', async (req, res) => {
       offset = (page - 1) * limit;
     }
 
+    // Build search condition if searching
+    let searchCondition = '';
+    let searchParams = [];
+    if (searchQuery) {
+      searchCondition = `
+        LEFT JOIN employees e1 ON trips.driver = e1.uuid
+        LEFT JOIN employees e2 ON trips.helper = e2.uuid
+        WHERE (
+          LOWER(tracking_number) LIKE LOWER($1) OR
+          LOWER(invoice_number) LIKE LOWER($1) OR
+          LOWER(origin) LIKE LOWER($1) OR
+          LOWER(farm_name) LIKE LOWER($1) OR
+          LOWER(destination) LIKE LOWER($1) OR
+          LOWER(full_destination) LIKE LOWER($1) OR
+          LOWER(truck_plate) LIKE LOWER($1) OR
+          LOWER(COALESCE(e1.name, '')) LIKE LOWER($1) OR
+          LOWER(COALESCE(e2.name, '')) LIKE LOWER($1) OR
+          LOWER(status) LIKE LOWER($1)
+        )
+      `;
+      searchParams = [`%${searchQuery}%`];
+    }
+
     // For paginated requests, use separate optimized queries
     if (limit !== null) {
+      let tripsQuery, countQuery, tripsParams, countParams;
+
+      // Regular paginated query (with optional search)
+      tripsQuery = `SELECT * FROM trips ${searchCondition} ORDER BY id DESC LIMIT $${searchParams.length + 1} OFFSET $${searchParams.length + 2}`;
+      countQuery = `SELECT COUNT(*) as total FROM trips ${searchCondition}`;
+      tripsParams = [...searchParams, limit, offset];
+      countParams = searchParams;
+
       // Get data first (usually faster)
-      const tripsResult = await query(
-        'SELECT * FROM trips ORDER BY id DESC LIMIT $1 OFFSET $2',
-        [limit, offset]
-      );
+      const tripsResult = await query(tripsQuery, tripsParams);
 
       // Get fresh count (no caching in serverless environments)
-      const countResult = await query('SELECT COUNT(*) as total FROM trips');
+      const countResult = await query(countQuery, countParams);
       const total = parseInt(countResult.rows[0].total);
 
       const trips = tripsResult.rows;
@@ -383,10 +412,11 @@ app.get('/api/trips/calculated', async (req, res) => {
       });
     }
 
-    // For "all" requests, get count and all trips
-    const countResult = await query('SELECT COUNT(*) as total FROM trips');
+    // For "all" requests, get count and all trips (with optional search)
+    const countQuery = `SELECT COUNT(*) as total FROM trips ${searchCondition}`;
+    const countResult = await query(countQuery, searchParams);
     const total = parseInt(countResult.rows[0].total);
-    const tripsResult = await query('SELECT * FROM trips ORDER BY id DESC');
+    const tripsResult = await query(`SELECT * FROM trips ${searchCondition} ORDER BY id DESC`, searchParams);
 
     // Get all rates for calculation (cached)
     const ratesCacheKey = 'rates:all';

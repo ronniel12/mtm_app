@@ -3,6 +3,34 @@
     <div class="list-header">
       <h2>🚚 MTM ENTERPRISE Trip Receipts</h2>
       <div class="filters">
+        <!-- Search Input -->
+        <div class="search-container">
+          <div class="search-input-wrapper">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              type="text"
+              v-model="searchQuery"
+              @input="debouncedSearch"
+              placeholder="Search trips (invoice, destination, driver, plate...) 🔍"
+              class="search-input"
+            />
+            <button
+              v-if="searchQuery"
+              @click="clearSearch"
+              class="clear-search-btn"
+              title="Clear search"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <select v-model="dateFilter" @change="filterTrips">
           <option value="">All Trips</option>
           <option value="week">Trips this Week</option>
@@ -190,8 +218,8 @@
       </div>
     </div>
 
-    <!-- Pagination Controls -->
-    <div v-if="totalPages > 1" class="pagination-container">
+    <!-- Pagination Controls - Hide when searching -->
+    <div v-if="totalPages > 1 && !searchQuery" class="pagination-container">
       <div class="pagination-info">
         Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, totalTrips) }} of {{ totalTrips }} trips
       </div>
@@ -223,6 +251,13 @@
         >
           Next →
         </button>
+      </div>
+    </div>
+
+    <!-- Search Results Info -->
+    <div v-if="searchQuery && filteredTrips.length > 0" class="search-results-info">
+      <div class="search-results-text">
+        Found {{ filteredTrips.length }} trip{{ filteredTrips.length === 1 ? '' : 's' }} matching "{{ searchQuery }}"
       </div>
     </div>
 
@@ -261,10 +296,12 @@ import { API_BASE_URL } from '@/api/config'
 
 const trips = ref([])
 const dateFilter = ref('')
+const searchQuery = ref('')
 const selectedTrip = ref(null)
 const loading = ref(false)
 const employees = ref([])
 const isRefreshing = ref(false)
+const searchTimeout = ref(null)
 
 // Touch handling for native mobile feel
 let touchStartY = 0
@@ -311,18 +348,30 @@ const fetchData = async (forceRefresh = false) => {
     // Add cache-busting parameter for forced refresh
     const cacheBust = forceRefresh ? `&_t=${Date.now()}` : ''
 
+    // Build search parameters
+    const searchParams = searchQuery.value ? `&search=${encodeURIComponent(searchQuery.value)}` : ''
+
+    // Use 'all' limit when searching, otherwise use pagination
+    const limitParam = searchQuery.value ? 'all' : pageSize.value
+
     const [tripsResponse, employeesResponse] = await Promise.all([
-      axios.get(`${API_BASE_URL}/trips/calculated?page=${currentPage.value}&limit=${pageSize.value}${cacheBust}`),
+      axios.get(`${API_BASE_URL}/trips/calculated?page=${currentPage.value}&limit=${limitParam}${searchParams}${cacheBust}`),
       axios.get(`${API_BASE_URL}/employees${forceRefresh ? `?_t=${Date.now()}` : ''}`)
     ])
 
     // Force reactivity update by creating new arrays
     trips.value = [...tripsResponse.data.trips]
-    console.log(`✅ TripList: Loaded ${trips.value.length} trips`)
+    console.log(`✅ TripList: Loaded ${trips.value.length} trips${searchQuery.value ? ` (search: "${searchQuery.value}")` : ''}`)
 
-    // Update pagination metadata
-    totalTrips.value = tripsResponse.data.pagination.total
-    totalPages.value = tripsResponse.data.pagination.totalPages
+    // Update pagination metadata (only when not searching)
+    if (!searchQuery.value) {
+      totalTrips.value = tripsResponse.data.pagination.total
+      totalPages.value = tripsResponse.data.pagination.totalPages
+    } else {
+      // When searching, set total to current results count
+      totalTrips.value = trips.value.length
+      totalPages.value = 1 // All results on one page
+    }
 
     employees.value = [...employeesResponse.data]
     console.log(`✅ TripList: Loaded ${employees.value.length} employees`)
@@ -396,6 +445,25 @@ const visiblePages = computed(() => {
 
 const filterTrips = () => {
   // Reset to first page when filter changes
+  currentPage.value = 1
+  // Clear search when date filter changes
+  searchQuery.value = ''
+  fetchData()
+}
+
+// Search functions
+const debouncedSearch = () => {
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value)
+  }
+  searchTimeout.value = setTimeout(() => {
+    currentPage.value = 1 // Reset to first page when searching
+    fetchData()
+  }, 500) // 500ms debounce
+}
+
+const clearSearch = () => {
+  searchQuery.value = ''
   currentPage.value = 1
   fetchData()
 }
@@ -682,11 +750,137 @@ defineExpose({
   color: #333;
 }
 
-.filters select {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+.filters {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-container {
+  flex: 1;
+  min-width: 300px;
+  max-width: 500px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  color: #64748b;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 40px 10px 40px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
   font-size: 0.9rem;
+  background: white;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-input::placeholder {
+  color: #94a3b8;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.filters select {
+  padding: 10px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  outline: none;
+  min-width: 150px;
+}
+
+.filters select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Search Results Info */
+.search-results-info {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.search-results-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1565c0;
+  margin: 0;
+}
+
+/* Mobile responsive search */
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .search-container {
+    min-width: auto;
+    max-width: none;
+  }
+
+  .search-input {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+
+  .filters select {
+    min-width: auto;
+  }
+
+  .search-results-info {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .search-results-text {
+    font-size: 0.85rem;
+  }
 }
 
 .shipments-grid {
