@@ -23,7 +23,7 @@
             id="search-input"
             v-model="searchQuery"
             class="search-input"
-            placeholder="Search by billing number, client, or preparer"
+            placeholder="Search by billing number, client, preparer, or date"
             @input="filterBillings"
           />
         </div>
@@ -258,6 +258,83 @@ const formatCurrency = (amount) => {
   }).format(amount)
 }
 
+// Parse various date formats into a Date object
+const parseDateFromInput = (dateInput) => {
+  if (!dateInput || typeof dateInput !== 'string') return null
+
+  const input = dateInput.trim().toLowerCase()
+
+  // Try various date formats
+  const formats = [
+    // MM/DD/YYYY (11/1/2025)
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+    // Month DD, YYYY (november 1, 2025, november 01, 2025)
+    /^([a-zA-Z]+)\s+(\d{1,2}),?\s+(\d{4})$/,
+    // DD Month YYYY (1 november 2025, 01 november 2025)
+    /^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/,
+    // YYYY-MM-DD (2025-11-01)
+    /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
+    // Month YYYY (november 2025)
+    /^([a-zA-Z]+)\s+(\d{4})$/
+  ]
+
+  const monthNames = {
+    january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+    july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+    jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+  }
+
+  for (let i = 0; i < formats.length; i++) {
+    const match = input.match(formats[i])
+    if (match) {
+      let year, month, day
+
+      if (i === 0) { // MM/DD/YYYY
+        month = parseInt(match[1]) - 1
+        day = parseInt(match[2])
+        year = parseInt(match[3])
+      } else if (i === 1) { // Month DD, YYYY
+        year = parseInt(match[3])
+        const monthName = match[1].toLowerCase()
+        month = monthNames[monthName]
+        day = parseInt(match[2])
+      } else if (i === 2) { // DD Month YYYY
+        year = parseInt(match[3])
+        const monthName = match[2].toLowerCase()
+        month = monthNames[monthName]
+        day = parseInt(match[1])
+      } else if (i === 3) { // YYYY-MM-DD
+        year = parseInt(match[1])
+        month = parseInt(match[2]) - 1
+        day = parseInt(match[3])
+      } else if (i === 4) { // Month YYYY
+        year = parseInt(match[2])
+        const monthName = match[1].toLowerCase()
+        month = monthNames[monthName]
+        day = 1 // Default to first day for month-year searches
+      }
+
+      // Validate date ranges
+      if (year >= 2000 && year <= 2030 &&
+          month >= 0 && month <= 11) {
+        if (i === 4) { // Month YYYY - return special object
+          return { type: 'monthYear', year: year, month: month }
+        } else if (day >= 1 && day <= 31) {
+          const date = new Date(year, month, day)
+          // Additional validation - check if date is actually valid
+          if (date.getFullYear() === year &&
+              date.getMonth() === month &&
+              date.getDate() === day) {
+            return date
+          }
+        }
+      }
+    }
+  }
+
+  return null
+}
+
 const fetchBillings = async (page = 1) => {
   try {
     loading.value = true
@@ -323,14 +400,46 @@ const filterBillings = () => {
     )
   }
 
-  // Search filter
+  // Search filter (includes text and date search)
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(billing =>
-      billing.billingNumber.toLowerCase().includes(query) ||
-      billing.client.name.toLowerCase().includes(query) ||
-      billing.preparedBy.toLowerCase().includes(query)
-    )
+    filtered = filtered.filter(billing => {
+      // Text search (existing functionality)
+      const textMatch = billing.billingNumber.toLowerCase().includes(query) ||
+                        billing.client.name.toLowerCase().includes(query) ||
+                        billing.preparedBy.toLowerCase().includes(query)
+
+      // Date search (new functionality)
+      let dateMatch = false
+      try {
+        const searchDate = parseDateFromInput(searchQuery.value)
+        if (searchDate) {
+          if (searchDate.type === 'monthYear') {
+            // Handle month-year searches (e.g., "november 2025")
+            const periodStart = new Date(billing.period.startDate)
+            const periodEnd = new Date(billing.period.endDate)
+            // Check if the billing's period overlaps with the specified month/year
+            const billingStart = new Date(periodStart.getFullYear(), periodStart.getMonth(), 1)
+            const billingEnd = new Date(periodEnd.getFullYear(), periodEnd.getMonth() + 1, 0) // Last day of month
+            const searchMonthStart = new Date(searchDate.year, searchDate.month, 1)
+            const searchMonthEnd = new Date(searchDate.year, searchDate.month + 1, 0) // Last day of search month
+
+            // Check for overlap between billing period and search month
+            dateMatch = !(billingEnd < searchMonthStart || billingStart > searchMonthEnd)
+          } else {
+            // Handle specific date searches
+            const periodStart = new Date(billing.period.startDate)
+            const periodEnd = new Date(billing.period.endDate)
+            dateMatch = searchDate >= periodStart && searchDate <= periodEnd
+          }
+        }
+      } catch (e) {
+        // Invalid date input, ignore date matching
+      }
+
+      // Return true if either text or date matches
+      return textMatch || dateMatch
+    })
   }
 
   filteredBillings.value = filtered
@@ -464,22 +573,22 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`.replace(/\n/g, '<br>')
     const bgColor = index % 2 === 1 ? '#fafafa' : 'white'
     tableHTML += `
 <tr style="background: ${bgColor};">
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${formatDateShort(trip.date)}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.truckPlate}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.invoiceNumber}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.destination}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.numberOfBags}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${formatCurrency(trip.rate)}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${formatCurrency(trip.total)}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${formatDateShort(trip.date)}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${trip.truckPlate}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${trip.invoiceNumber}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${trip.destination}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${trip.numberOfBags}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: right;">₱${formatCurrency(trip.rate)}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: right;">₱${formatCurrency(trip.total)}</td>
 </tr>`
   })
 
   tableHTML += `
 <tr style="background: #e0e0e0; font-weight: bold;">
-<td colspan="4" style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">GRAND TOTAL:</td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 14px;">${billing.totals.totalBags}</td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
-<td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 14px;">₱${formatCurrency(billing.totals.totalRevenue)}</td>
+<td colspan="4" style="border: 2px solid #000; padding: 4px; text-align: left; font-size: 11px;">GRAND TOTAL:</td>
+<td style="border: 2px solid #000; padding: 4px; text-align: center; font-size: 12px;">${billing.totals.totalBags}</td>
+<td style="border: 2px solid #000; padding: 4px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 4px; text-align: right; font-size: 12px;">₱${formatCurrency(billing.totals.totalRevenue)}</td>
 </tr>
 </tbody>
 </table>`
@@ -494,19 +603,20 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`.replace(/\n/g, '<br>')
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, sans-serif; color: #000; padding: 0; }
   .no-print { display: none; }
-  .company-name-print { font-size: 28px; font-weight: bold; text-align: center; letter-spacing: 2px; margin-bottom: 15px; }
-  .company-details-print { font-size: 14px; text-align: center; line-height: 1.4; margin-bottom: 20px; }
-  .billing-title-print { font-size: 20px; font-weight: bold; text-align: center; margin: 15px 0 20px 0; }
-  .bill-to-print { margin-bottom: 20px; }
-  .bill-to-title-print { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
-  .bill-to-details-print { font-size: 12px; line-height: 1.4; margin-bottom: 15px; }
-  .billing-info-print { font-size: 12px; margin-bottom: 15px; text-align: left; line-height: 1.4; }
-  @page { size: A4; margin: 25mm; }
+  .company-name-print { font-size: 22px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-bottom: 8px; }
+  .company-details-print { font-size: 11px; text-align: center; line-height: 1.2; margin-bottom: 10px; }
+  .billing-title-print { font-size: 16px; font-weight: bold; text-align: center; margin: 8px 0 12px 0; }
+  .bill-to-print { margin-bottom: 8px; }
+  .bill-to-title-print { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
+  .bill-to-details-print { font-size: 10px; line-height: 1.2; margin-bottom: 6px; }
+  .billing-info-print { font-size: 10px; margin-bottom: 8px; text-align: left; line-height: 1.3; }
+  .prepared-by-print { margin-top: 8px; font-size: 12px; font-weight: bold; }
+  @page { size: A4; margin: 15mm; }
 }
 </style>
 </head>
 <body>
-<div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; text-align: center;">
+<div style="border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 12px; text-align: center;">
 <h1 class="company-name-print">MTM ENTERPRISE</h1>
 <div class="company-details-print">
 ${companyInfo}
@@ -529,7 +639,7 @@ ${billToInfo}
 
 ${tableHTML}
 
-<div style="margin-top: 30px; padding: 15px 0; font-size: 14px; font-weight: bold;">
+<div class="prepared-by-print">
 <strong>Prepared by:</strong> ${billing.preparedBy}
 </div>
 </body>
