@@ -433,9 +433,33 @@
               <button type="submit" class="btn-submit">Add Rate</button>
             </div>
           </form>
+          </div>
+
+        <!-- Search Bar -->
+        <div v-if="allRates.length > 0" class="search-container">
+          <div class="search-wrapper">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search by town, province, or rate..."
+              class="search-input"
+            />
+          </div>
+          <div v-if="searchQuery" class="search-results">
+            Showing {{ Object.values(filteredRates).flat().length }} of {{ allRates.length }} rates
+            <button @click="searchQuery = ''" class="clear-search-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+              Clear
+            </button>
+          </div>
         </div>
-
-
 
         <div class="rates-list">
           <div class="rates-by-province">
@@ -730,6 +754,7 @@ const activeTab = ref('employees')
 const employees = ref([])
 const vehicles = ref([])
 const allRates = ref([])
+const searchQuery = ref('')
 const showAddEmployeeForm = ref(false)
 const showAddVehicleForm = ref(false)
 const showAddRateForm = ref(false)
@@ -764,9 +789,19 @@ const rateForm = ref({
   newRates: ''
 })
 
+const filteredRates = computed(() => {
+  if (!searchQuery.value.trim()) return allRates.value
+  return allRates.value.filter(rate =>
+    rate.town.toLowerCase().includes(searchQuery.value.toLowerCase().trim()) ||
+    rate.province.toLowerCase().includes(searchQuery.value.toLowerCase().trim()) ||
+    rate.newRates.toString().includes(searchQuery.value.trim())
+  )
+})
+
 const groupedRates = computed(() => {
+  const rates = filteredRates.value
   const groups = {}
-  allRates.value.forEach(rate => {
+  rates.forEach(rate => {
     if (!groups[rate.province]) {
       groups[rate.province] = []
     }
@@ -1506,6 +1541,77 @@ const getInitials = (name) => {
 .btn-delete-small {
   background: #dc3545;
   color: white;
+}
+
+/* Search Styles */
+.search-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.search-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  color: #a0aec0;
+  width: 20px;
+  height: 20px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 3rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.search-results {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: #718096;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clear-search-btn {
+  background: #e2e8f0;
+  border: none;
+  border-radius: 4px;
+  color: #4a5568;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background: #cbd5e0;
 }
 
 /* Enhanced Form Styles */
