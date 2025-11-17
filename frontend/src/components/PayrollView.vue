@@ -652,11 +652,7 @@ const filteredEmployeeTrips = computed(() => {
 
   // Then expand to show separate entries for each role
   // If employee was both driver and helper on same trip, they get two entries
-  return expandEmployeeTrips(participatingTrips).sort((a, b) => {
-    // Sort by date, then by truck plate to group related trips together
-    if (a.date !== b.date) return new Date(a.date) - new Date(b.date)
-    return (a.truckPlate || '').localeCompare(b.truckPlate || '')
-  })
+  return expandEmployeeTrips(participatingTrips).sort((a, b) => new Date(a.date) - new Date(b.date))
 })
 
 const totalPay = computed(() => {
