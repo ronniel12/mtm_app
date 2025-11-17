@@ -220,6 +220,7 @@ app.get('/api/trips', async (req, res) => {
         driver: trip.driver,
         helper: trip.helper,
         numberOfBags: trip.number_of_bags,
+        foodAllowance: trip.food_allowance,
         createdAt: adjustedCreatedAt,
         updatedAt: adjustedUpdatedAt,
         computedToll: trip.computed_toll,
@@ -557,6 +558,7 @@ app.get('/api/trips/:id', async (req, res) => {
       driver: trip.driver,
       helper: trip.helper,
       numberOfBags: trip.number_of_bags,
+      foodAllowance: trip.food_allowance,
       createdAt: trip.created_at,
       updatedAt: trip.updated_at,
       computedToll: trip.computed_toll,
@@ -582,6 +584,23 @@ app.post('/api/trips', jsonParser, async (req, res) => {
       return res.status(400).json({ error: 'Request body is required' });
     }
 
+    // Check if there's already a trip on this date with food allowance
+    const tripDate = body.date;
+    let foodAllowance = 0;
+
+    if (tripDate) {
+      const existingTripResult = await query(
+        'SELECT COUNT(*) as count FROM trips WHERE date = $1 AND food_allowance > 0',
+        [tripDate]
+      );
+      const existingCount = parseInt(existingTripResult.rows[0].count);
+
+      // Set food allowance to 450 only if no existing trip on this date has it
+      if (existingCount === 0) {
+        foodAllowance = 450.00;
+      }
+    }
+
     // Use current UTC time - PostgreSQL will handle timezone conversion
     const finalTimestamp = new Date().toISOString();
 
@@ -595,7 +614,7 @@ app.post('/api/trips', jsonParser, async (req, res) => {
     const newTrip = {
       id: nextId,
       tracking_number: `TRP${String(nextId).padStart(3, '0')}`,
-      date: body.date || utcNow.toISOString().split('T')[0],
+      date: tripDate || utcNow.toISOString().split('T')[0],
       truck_plate: body.truckPlate || 'NGU 9174',
       invoice_number: body.invoiceNumber || 'To be assigned',
       origin: body.origin || 'Dampol 2nd A, Pulilan Bulacan',
@@ -607,17 +626,18 @@ app.post('/api/trips', jsonParser, async (req, res) => {
       estimated_delivery: body.estimatedDelivery || tomorrow.toISOString().split('T')[0],
       driver: body.driver || 'MTM Driver',
       helper: body.helper || '',
-      number_of_bags: body.numberOfBags || 1
+      number_of_bags: body.numberOfBags || 1,
+      food_allowance: foodAllowance
     };
 
     const result = await query(`
-      INSERT INTO trips (id, tracking_number, date, truck_plate, invoice_number, origin, farm_name, destination, full_destination, rate_lookup_key, status, estimated_delivery, driver, helper, number_of_bags, computed_toll, roundtrip_toll, actual_toll_expense, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+      INSERT INTO trips (id, tracking_number, date, truck_plate, invoice_number, origin, farm_name, destination, full_destination, rate_lookup_key, status, estimated_delivery, driver, helper, number_of_bags, food_allowance, computed_toll, roundtrip_toll, actual_toll_expense, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
       RETURNING *
     `, [
       newTrip.id, newTrip.tracking_number, newTrip.date, newTrip.truck_plate, newTrip.invoice_number,
       newTrip.origin, newTrip.farm_name, newTrip.destination, newTrip.full_destination, newTrip.rate_lookup_key,
-      newTrip.status, newTrip.estimated_delivery, newTrip.driver, newTrip.helper, newTrip.number_of_bags,
+      newTrip.status, newTrip.estimated_delivery, newTrip.driver, newTrip.helper, newTrip.number_of_bags, newTrip.food_allowance,
       0, // computed_toll default
       0, // roundtrip_toll default
       0, // actual_toll_expense default
@@ -625,7 +645,7 @@ app.post('/api/trips', jsonParser, async (req, res) => {
       finalTimestamp  // updated_at
     ]);
 
-    console.log('Creating new trip:', newTrip.tracking_number);
+    console.log('Creating new trip:', newTrip.tracking_number, 'Food allowance:', newTrip.food_allowance);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating trip:', error);
@@ -693,6 +713,7 @@ app.put('/api/trips/:id', jsonParser, async (req, res) => {
       driver: trip.driver,
       helper: trip.helper,
       numberOfBags: trip.number_of_bags,
+      foodAllowance: trip.food_allowance,
       createdAt: trip.created_at,
       updatedAt: trip.updated_at,
       // Toll-related fields (convert snake_case to camelCase)

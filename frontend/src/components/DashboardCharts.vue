@@ -120,6 +120,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
+import { API_BASE_URL } from '@/api/config'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -159,20 +160,38 @@ const filterOptions = [
   { title: 'This Year', value: 'yearly' }
 ]
 
-const props = defineProps({
-  trips: {
-    type: Array,
-    default: () => []
-  },
-  employees: {
-    type: Array,
-    default: () => []
+// Local data
+const trips = ref([])
+const employees = ref([])
+const isLoading = ref(true)
+const error = ref(null)
+
+// Fetch data function
+const fetchDashboardData = async () => {
+  try {
+    isLoading.value = true
+    error.value = null
+
+    // Use optimized endpoint that includes pre-calculated rates
+    const [tripsRes, employeesRes] = await Promise.all([
+      axios.get(`${API_BASE_URL}/trips/calculated?limit=all`),
+      axios.get(`${API_BASE_URL}/employees`)
+    ])
+
+    // Data is already processed by the API with pre-calculated rates
+    trips.value = tripsRes.data.trips || []
+    employees.value = employeesRes.data
+  } catch (err) {
+    console.error('Error fetching dashboard data:', err)
+    error.value = 'Failed to load dashboard data. Please check if the backend server is running.'
+  } finally {
+    isLoading.value = false
   }
-})
+}
 
 // Total counts (unchanging)
-const activeEmployees = computed(() => props.employees.length)
-const completedTrips = computed(() => props.trips.filter(t => t.status === 'Completed').length)
+const activeEmployees = computed(() => employees.value.length)
+const completedTrips = computed(() => trips.value.filter(t => t.status === 'Completed').length)
 
 // Filtered data based on selected filters
 const getDateRange = (filter) => {
@@ -203,11 +222,11 @@ const getDateRange = (filter) => {
 
 const filteredTrips = computed(() => {
   if (filterPeriod.value === 'all') {
-    return props.trips
+    return trips.value
   }
 
   const startDate = getDateRange(filterPeriod.value)
-  return props.trips.filter(trip => {
+  return trips.value.filter(trip => {
     const tripDate = new Date(trip.date)
     return tripDate >= startDate
   })
@@ -256,7 +275,12 @@ const updateFilter = () => {
 }
 
 const recentTripsData = computed(() => {
-  return [...props.trips].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5)
+  return [...trips.value].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5)
+})
+
+// Initialize data
+onMounted(() => {
+  fetchDashboardData()
 })
 
 const monthlyTripsData = computed(() => {

@@ -22,6 +22,7 @@ async function createTables() {
         driver TEXT,
         helper TEXT,
         number_of_bags INTEGER DEFAULT 1,
+        food_allowance DECIMAL(10,2) DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )
@@ -117,9 +118,18 @@ async function createTables() {
         type VARCHAR(50),
         value DECIMAL(10,2),
         is_default BOOLEAN DEFAULT false,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Add updated_at column to existing deductions table
+    try {
+      await query(`ALTER TABLE deductions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+      console.log('✅ Added missing updated_at column to deductions table');
+    } catch (error) {
+      console.log('ℹ️ updated_at column may already exist in deductions table:', error.message);
+    }
 
     // Create vehicles table
     await query(`
@@ -241,9 +251,25 @@ async function createTables() {
         message_content TEXT,
         recipient_contact TEXT,
         error_message TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Add missing columns to existing notification_history table
+    try {
+      await query(`ALTER TABLE notification_history ADD COLUMN IF NOT EXISTS vehicle_id INTEGER REFERENCES vehicles(id) ON DELETE CASCADE`);
+      await query(`ALTER TABLE notification_history ADD COLUMN IF NOT EXISTS maintenance_schedule_id INTEGER REFERENCES maintenance_schedules(id) ON DELETE SET NULL`);
+      await query(`ALTER TABLE notification_history ADD COLUMN IF NOT EXISTS notification_type VARCHAR(50) NOT NULL`);
+      await query(`ALTER TABLE notification_history ADD COLUMN IF NOT EXISTS delivery_method VARCHAR(20) NOT NULL`);
+      await query(`ALTER TABLE notification_history ADD COLUMN IF NOT EXISTS message_content TEXT`);
+      await query(`ALTER TABLE notification_history ADD COLUMN IF NOT EXISTS recipient_contact TEXT`);
+      await query(`ALTER TABLE notification_history ADD COLUMN IF NOT EXISTS error_message TEXT`);
+      await query(`ALTER TABLE notification_history ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+      console.log('✅ Added missing columns to notification_history table');
+    } catch (error) {
+      console.log('ℹ️ Some columns may already exist in notification_history table:', error.message);
+    }
 
     // Create user_contacts table for messaging
     await query(`

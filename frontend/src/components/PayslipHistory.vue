@@ -210,6 +210,10 @@ import axios from 'axios'
 import PayslipPreview from './PayslipPreview.vue'
 import EditPayslipForm from './EditPayslipForm.vue'
 import { API_BASE_URL, API_ENDPOINTS } from '@/api/config'
+import { useDataRefresh } from '../composables/useDataRefresh'
+
+// Initialize global refresh system
+const { onRefresh } = useDataRefresh()
 
 // Data
 const allPayslips = ref([])
@@ -663,6 +667,13 @@ const handlePayslipUpdated = (updatedPayslip) => {
   }
   closeEditModal()
 }
+
+// 📡 Listen for payslip creation/deletion events to refresh the list
+onRefresh('payslips', async () => {
+  console.log('🔄 Payslip refresh triggered - reloading payslips...')
+  await fetchPayslips()
+  console.log('✅ Payslip history refreshed')
+})
 
 // Lifecycle
 onMounted(() => {

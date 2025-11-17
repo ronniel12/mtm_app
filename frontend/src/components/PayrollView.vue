@@ -106,7 +106,7 @@
                   <td class="col-invoice">{{ trip.invoiceNumber }}</td>
                   <td class="col-destination">{{ trip.fullDestination }}</td>
                   <td class="col-bags text-center">{{ trip.numberOfBags }}</td>
-                  <td class="col-position text-center">{{ trip._role }}</td>
+                  <td class="col-position text-center">{{ formatEmployeeRole(trip._role) }}</td>
                   <td class="col-rate text-right">{{ trip._rate ? formatCurrency(trip._rate - 4) : '0.00' }}</td>
                   <td class="col-total text-right">{{ trip._rate && trip.numberOfBags ? formatCurrency((trip._rate - 4) * trip.numberOfBags * trip._commission) : '0.00' }}</td>
                 </tr>
@@ -142,7 +142,7 @@
                   </td>
                   <td class="deduction-amount-cell text-right">
                     <span class="deduction-amount">
-                      -₱{{ formatCurrency(deduction.type === 'percentage' ? (totalPay * deduction.value / 100) : deduction.value) }}
+                      -₱{{ formatCurrency(calculateDeductionAmount(deduction)) }}
                     </span>
                   </td>
                 </tr>
@@ -247,7 +247,7 @@
             </div>
             <div class="meta-item">
               <span class="meta-icon">👤</span>
-              <span class="meta-text">{{ trip._role === 'D' ? 'Driver' : 'Helper' }}</span>
+              <span class="meta-text">{{ formatEmployeeRole(trip._role) }}</span>
             </div>
             <div class="meta-item">
               <span class="meta-icon">📅</span>
@@ -281,7 +281,7 @@
               <span class="deduction-name-mobile">{{ deduction.name }}</span>
               <span class="deduction-value-mobile">
                 {{ deduction.type === 'percentage' ? `${deduction.value}%` : `₱${formatCurrency(deduction.value)}` }}
-                (₱{{ formatCurrency(deduction.type === 'percentage' ? (totalPay * deduction.value / 100) : deduction.value) }})
+                (₱{{ formatCurrency(calculateDeductionAmount(deduction)) }})
               </span>
             </div>
             <div class="total-deductions-mobile">
@@ -499,6 +499,10 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '@/api/config'
+import { useDataRefresh } from '../composables/useDataRefresh'
+
+// Initialize global refresh system
+const { triggerRefresh } = useDataRefresh()
 
 const trips = ref([])
 const employees = ref([])
@@ -583,6 +587,47 @@ const expandEmployeeTrips = (trips) => {
   return expandedTrips
 }
 
+// Centralized payslip calculation system for consistency across display, save, and export
+const calculatePayslipTotals = (tripsData, deductionsData) => {
+  // Calculate gross pay (total pay)
+  const grossPay = tripsData.reduce((sum, trip) => {
+    if (trip._rate && trip.numberOfBags) {
+      const adjustedRate = trip._rate - 4
+      const pay = (adjustedRate * trip.numberOfBags) * trip._commission
+      return sum + (isNaN(pay) ? 0 : pay)
+    }
+    return sum
+  }, 0)
+
+  // Calculate total deductions
+  const totalDeductions = deductionsData.reduce((sum, deduction) => {
+    // Ensure deduction value is a number
+    const deductionValue = parseFloat(deduction.value) || 0
+    if (deduction.type === 'percentage') {
+      const percentageAmount = (grossPay * (deductionValue / 100))
+      return sum + (isNaN(percentageAmount) ? 0 : percentageAmount)
+    } else {
+      return sum + (isNaN(deductionValue) ? 0 : deductionValue)
+    }
+  }, 0)
+
+  // Calculate net pay
+  const netPay = grossPay - totalDeductions
+
+  // Calculate total bags
+  const totalBags = tripsData.reduce((sum, trip) => {
+    const bags = parseInt(trip.numberOfBags) || 0
+    return sum + bags
+  }, 0)
+
+  return {
+    grossPay: isNaN(grossPay) ? 0 : grossPay,
+    totalDeductions: isNaN(totalDeductions) ? 0 : totalDeductions,
+    netPay: isNaN(netPay) ? 0 : netPay,
+    totalBags: totalBags
+  }
+}
+
 const filteredEmployeeTrips = computed(() => {
   if (!startDate.value || !endDate.value || !selectedEmployeeUuid.value) {
     return []
@@ -615,21 +660,13 @@ const filteredEmployeeTrips = computed(() => {
 })
 
 const totalPay = computed(() => {
-  return filteredEmployeeTrips.value.reduce((sum, trip) => {
-    if (trip._rate && trip.numberOfBags) {
-      // Use pre-calculated commission from the expanded trip data structure
-      const adjustedRate = trip._rate - 4
-      const pay = (adjustedRate * trip.numberOfBags) * trip._commission
-      return sum + pay
-    }
-    return sum
-  }, 0)
+  const totals = calculatePayslipTotals(filteredEmployeeTrips.value, deductions.value)
+  return totals.grossPay
 })
 
 const totalBags = computed(() => {
-  return filteredEmployeeTrips.value.reduce((sum, trip) => {
-    return sum + (trip.numberOfBags || 0)
-  }, 0)
+  const totals = calculatePayslipTotals(filteredEmployeeTrips.value, deductions.value)
+  return totals.totalBags
 })
 
 const autoApplySavedDeductions = () => {
@@ -741,18 +778,139 @@ const cancelEdit = () => {
 }
 
 const totalDeductions = computed(() => {
-  return deductions.value.reduce((sum, deduction) => {
-    if (deduction.type === 'percentage') {
-      return sum + (totalPay.value * (deduction.value / 100))
-    } else {
-      return sum + deduction.value
-    }
-  }, 0)
+  const totals = calculatePayslipTotals(filteredEmployeeTrips.value, deductions.value)
+  return totals.totalDeductions
 })
 
 const netPay = computed(() => {
-  return totalPay.value - totalDeductions.value
+  const totals = calculatePayslipTotals(filteredEmployeeTrips.value, deductions.value)
+  return totals.netPay
 })
+
+// Individual deduction amounts calculation
+const calculateDeductionAmount = (deduction) => {
+  const grossPay = totalPay.value
+  const deductionValue = parseFloat(deduction.value) || 0
+  return deduction.type === 'percentage'
+    ? (grossPay * (deductionValue / 100))
+    : deductionValue
+}
+
+// Unified formatting helpers for consistent output across all exports
+const formatEmployeeRole = (role) => {
+  return role === 'D' ? 'Driver' : role === 'H' ? 'Helper' : role
+}
+
+const formatDeductionLine = (deduction) => {
+  const amount = calculateDeductionAmount(deduction)
+  const displayValue = deduction.type === 'percentage'
+    ? `${deduction.value}%`
+    : `₱${formatCurrency(deduction.value)}`
+  return `${deduction.name} (${displayValue})`
+}
+
+const formatDeductionAmount = (deduction) => {
+  return formatCurrency(calculateDeductionAmount(deduction))
+}
+
+// Create unified payslip data structure for ALL outputs (display, exports, print)
+const getUnifiedPayslipData = () => {
+  return {
+    // Company information
+    company: {
+      name: 'MTM ENTERPRISE',
+      address: '0324 P. Damaso St. Virgen Delas Flores Baliuag Bulacan',
+      tin: 'TIN # 175-434-337-000',
+      contact: 'Mobile No. 09605638462 / Telegram No. +358-044-978-8592'
+    },
+
+    // Employee information (same as main display)
+    employee: {
+      name: selectedEmployeeName.value // Only name, no UUID like main display
+    },
+
+    // Payslip metadata (exact same format as main display)
+    payslip: {
+      number: payslipNumber.value,
+      period: formatPeriod(), // "start_date to end_date" format
+      dateGenerated: formatDate(new Date()) // Long date format like main display
+    },
+
+    // Prepared by (same as footer)
+    preparedBy: preparedBy.value,
+
+    // Trips data (same formatting as table display)
+    trips: filteredEmployeeTrips.value.map(trip => ({
+      date: formatDateShort(trip.date), // Short date format like table
+      invoice: trip.invoiceNumber, // "INVOICE NUMBER" column
+      destination: trip.fullDestination, // "DESTINATION" column
+      plate: trip.truckPlate, // "PLATE NUMBER" column
+      bags: trip.numberOfBags, // "BAGS" column
+      role: formatEmployeeRole(trip._role), // "POS" column (Driver/Helper)
+      rate: `₱${formatCurrency(trip._rate ? trip._rate - 4 : 0)}`, // "RATE" column
+      total: `₱${formatCurrency(trip._rate && trip.numberOfBags ? (trip._rate - 4) * trip.numberOfBags * trip._commission : 0)}` // "TOTAL" column
+    })),
+
+    // Totals section (exact same as table rows)
+    summary: {
+      totalBags: totalBags.value,
+      grossPay: totalPay.value,
+      grossPayFormatted: `₱${formatCurrency(totalPay.value)}`, // "GROSS PAY:" row
+      netPay: netPay.value,
+      netPayFormatted: `₱${formatCurrency(netPay.value)}` // "NET PAY:" row
+    },
+
+    // Deductions (exact same as table rows - using WORKING display logic globally)
+    deductions: deductions.value.map(deduction => {
+      const deductionValue = Number(deduction.value) || 0
+      const displayValueForType = deduction.type === 'percentage' ? `${deductionValue}%` : `₱${formatCurrency(deductionValue)}`
+
+      return {
+        name: deduction.name, // Deduction name
+        indicator: displayValueForType, // Type indicator like template
+        displayValue: displayValueForType,
+        amount: `-₱${formatCurrency(calculateDeductionAmount(deduction))}` // Calculated amount
+      }
+    }),
+
+    // Total deductions (exact same as table row)
+    totalDeductions: {
+      label: 'TOTAL DEDUCTIONS:',
+      amount: `-₱${formatCurrency(totalDeductions.value)}`
+    }
+  }
+}
+
+// Backward compatibility - exports can still use different naming if needed
+const createPayslipData = () => {
+  const unified = getUnifiedPayslipData()
+
+  // Convert unified structure to export-specific format
+  return {
+    company: unified.company,
+    employee: {
+      name: unified.employee.name,
+      // No UUID in main display, so exports shouldn't have it either
+    },
+    payslip: unified.payslip,
+    preparedBy: unified.preparedBy,
+    trips: unified.trips,
+    totals: {
+      grossPay: unified.summary.grossPayFormatted,
+      totalBags: unified.summary.totalBags.toString(),
+      netPay: unified.summary.netPayFormatted
+    },
+    deductions: unified.deductions.map(d => ({
+      name: d.name,
+      displayValue: d.indicator,
+      amount: d.amount
+    })),
+    totalsDeductions: {
+      label: unified.totalDeductions.label,
+      amount: unified.totalDeductions.amount
+    }
+  }
+}
 
 // Deduction methods
 const openDeductionsModal = () => {
@@ -892,10 +1050,13 @@ const exportPDF = () => {
     return
   }
 
-  const companyInfo = `MTM ENTERPRISE<br>
-0324 P. Damaso St. Virgen Delas Flores Baliuag Bulacan<br>
-TIN # 175-434-337-000<br>
-Mobile No. 09605638462 / Telegram No. +358-044-978-8592`
+  // Use unified data to prevent undefined/NAN values
+  const payslip = getUnifiedPayslipData()
+
+  const companyInfo = `${payslip.company.name}<br>
+${payslip.company.address}<br>
+${payslip.company.tin}<br>
+${payslip.company.contact}`.replace(/\n/g, '<br>')
 
   let tableHTML = `
 <table style="width: 100%; border-collapse: collapse; font-size: 10px; font-family: 'Courier New', monospace; margin-top: 20px;">
@@ -913,18 +1074,19 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`
 </thead>
 <tbody>`
 
-filteredEmployeeTrips.value.forEach((trip, index) => {
+// Use unified trip data to avoid undefined values
+payslip.trips.forEach((trip, index) => {
     const bgColor = index % 2 === 1 ? '#fafafa' : 'white'
     tableHTML += `
 <tr style="background: ${bgColor}; page-break-inside: avoid;">
-<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${formatDateShort(trip.date)}</td>
-<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.truckPlate}</td>
-<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.invoiceNumber}</td>
-<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.fullDestination}</td>
-<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.numberOfBags}</td>
-<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip._role}</td>
-<td style="border: 1px solid #000; padding: 2px; text-align: right; font-size: 8px;">₱${trip._rate ? formatCurrency(trip._rate - 4) : '0.00'}</td>
-<td style="border: 1px solid #000; padding: 2px; text-align: right; font-size: 8px;">₱${trip._total ? formatCurrency((trip._rate - 4) * trip.numberOfBags * trip._commission) : '0.00'}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.date}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.plate}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.invoice}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.destination}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.bags}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center; font-size: 8px;">${trip.role}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: right; font-size: 8px;">${trip.rate}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: right; font-size: 8px;">${trip.total}</td>
 </tr>`
   })
 
@@ -996,49 +1158,51 @@ ${tableHTML}
 }
 
 const exportExcel = () => {
-  // Add deductions data to the export
+  const payslip = createPayslipData()
+
+  // Create deductions data using unified formatting (already calculated in UnifiedPayslipData)
   let deductionsData = []
-  if (deductions.value && deductions.value.length > 0) {
-    deductionsData = deductions.value.map(deduction => [
-      deduction.name + ` (${deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value)})`,
+  if (payslip.deductions.length > 0) {
+    deductionsData = payslip.deductions.map(deduction => [
+      deduction.name + ' ' + deduction.displayValue,
       '',
       '',
       '',
       '',
       '',
       '',
-      `₱${formatCurrency(deduction.type === 'percentage' ? (totalPay.value * deduction.value / 100) : deduction.value)}`
+      deduction.amount
     ])
   }
 
-  // Create Excel data
+  // Create Excel data using unified data structure
   const data = [
     ['DATE', 'PLATE NUMBER', 'INVOICE NUMBER', 'DESTINATION', 'BAGS', 'POS', 'RATE', 'TOTAL'],
-    ...filteredEmployeeTrips.value.map(trip => [
-      formatDateShort(trip.date),
-      trip.truckPlate,
-      trip.invoiceNumber,
-      trip.fullDestination,
-      trip.numberOfBags,
-      trip._role,
-      `₱${trip._rate ? formatCurrency(trip._rate - 4) : '0.00'}`,
-      `₱${trip._rate && trip.numberOfBags ? formatCurrency((trip._rate - 4) * trip.numberOfBags * trip._commission) : '0.00'}`
+    ...payslip.trips.map(trip => [
+      trip.date,
+      trip.plate,
+      trip.invoice,
+      trip.destination,
+      trip.bags,
+      trip.role,
+      trip.rate,
+      trip.total
     ]),
-    ['GROSS PAY:', '', '', '', totalBags.value, '', '', `₱${formatCurrency(totalPay.value)}`],
+    [`GROSS PAY:`, '', '', '', payslip.totals.totalBags, '', '', payslip.totals.grossPay],
     ...deductionsData,
-    ...(deductions.value && deductions.value.length > 0 ? [
-      ['TOTAL DEDUCTIONS:', '', '', '', '', '', '', `-₱${formatCurrency(totalDeductions.value)}`],
-      ['NET PAY:', '', '', '', '', '', '', `₱${formatCurrency(netPay.value)}`]
+    ...(payslip.deductions.length > 0 ? [
+      [`${payslip.totalsDeductions.label}:`, '', '', '', '', '', '', payslip.totalsDeductions.amount],
+      ['NET PAY:', '', '', '', '', '', '', payslip.totals.netPay]
     ] : [])
   ]
 
-  // Add employee info to CSV data
-  data.splice(0, 0, [`Employee: ${selectedEmployeeName.value}`, `Employee UUID: ${selectedEmployeeUuid.value}`, `Payslip: ${payslipNumber.value}`])
-  data.splice(1, 0, ['Period:', `${formatPeriod()}`, 'Date Generated:', formatDate(new Date())])
+  // Add employee and payslip info to CSV data using unified structure
+  data.splice(0, 0, [`Employee: ${payslip.employee.name}`, `Payslip: ${payslip.payslip.number}`])
+  data.splice(1, 0, ['Period:', payslip.payslip.period, 'Date Generated:', payslip.payslip.dateGenerated])
 
-  // Add prepared by information to CSV data
+  // Add prepared by information using unified structure
   data.push([])
-  data.push(['Prepared by:', preparedBy.value || '_______________________________'])
+  data.push(['Prepared by:', payslip.preparedBy || '_______________________________'])
 
   // Create CSV content
   const csvContent = data.map(row =>
@@ -1050,7 +1214,7 @@ const exportExcel = () => {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `payslip_${selectedEmployeeName.value}_${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `payslip_${payslip.employee.name}_${new Date().toISOString().slice(0, 10)}.csv`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -1060,17 +1224,19 @@ const exportExcel = () => {
 }
 
 const printStatement = () => {
-  // Create print-friendly version
-  const companyInfo = `MTM ENTERPRISE
-0324 P. Damaso St. Virgen Delas Flores Baliuag Bulacan
-TIN # 175-434-337-000
-Mobile No. 09605638462 / Telegram No. +358-044-978-8592`.replace(/\n/g, '<br>')
+  // Use unified payslip data for print consistency
+  const payslip = createPayslipData()
 
-  const employeeInfo = `Employee Name: ${selectedEmployeeName.value}
-Employee UUID: ${selectedEmployeeUuid.value}
-Payslip Number: ${payslipNumber.value}
-Period Covered: ${formatPeriod()}
-Date Generated: ${formatDate(new Date())}`.replace(/\n/g, '<br>')
+  // Create print-friendly version using unified data
+  const companyInfo = `${payslip.company.name}
+${payslip.company.address}
+${payslip.company.tin}
+${payslip.company.contact}`.replace(/\n/g, '<br>')
+
+  const employeeInfo = `<strong>Employee Name:</strong> ${payslip.employee.name}<br>
+<strong>Payslip Number:</strong> ${payslip.payslip.number}<br>
+<strong>Period Covered:</strong> ${payslip.payslip.period}<br>
+<strong>Date Generated:</strong> ${payslip.payslip.dateGenerated}`.replace(/\n/g, '<br>')
 
   let tableHTML = `
 <table style="width: 100%; border-collapse: collapse; font-size: 8px; font-family: 'Courier New', monospace; margin-top: 5px;">
@@ -1086,65 +1252,63 @@ Date Generated: ${formatDate(new Date())}`.replace(/\n/g, '<br>')
 <td style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">TOTAL</td>
 </tr>`
 
-filteredEmployeeTrips.value.forEach((trip, index) => {
+  // Use unified trip data for consistent formatting
+  payslip.trips.forEach((trip, index) => {
     const bgColor = index % 2 === 1 ? '#fafafa' : 'white'
     tableHTML += `
 <tr style="background: ${bgColor};">
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${formatDateShort(trip.date)}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.truckPlate}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.invoiceNumber}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.fullDestination}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.numberOfBags}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip._role}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip._rate ? formatCurrency(trip._rate - 4) : '0.00'}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip._rate && trip.numberOfBags ? formatCurrency((trip._rate - 4) * trip.numberOfBags * trip._commission) : '0.00'}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.date}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.plate}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.invoice}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.destination}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.bags}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.role}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: right;">${trip.rate}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: right;">${trip.total}</td>
 </tr>`
   })
 
-    // Add deductions to the table if they exist
-  if (deductions.value && deductions.value.length > 0) {
+  // Add deductions using unified formatting if they exist
+  if (payslip.deductions.length > 0) {
     tableHTML += `
 <tr style="background: #e0e0e0; font-weight: bold;">
 <td style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 10px;">GROSS PAY:</td>
 <td></td>
 <td></td>
 <td></td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 10px;">${totalBags.value}</td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 10px;">${payslip.totals.totalBags}</td>
 <td></td>
 <td></td>
-<td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 10px;">₱${formatCurrency(totalPay.value)}</td>
+<td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 10px;">${payslip.totals.grossPay}</td>
 </tr>`
 
-    // Individual deductions breakdown
-    deductions.value.forEach(deduction => {
-      const deductionAmount = deduction.type === 'percentage'
-        ? (totalPay.value * (deduction.value / 100))
-        : deduction.value
+    // Individual deductions breakdown using unified data
+    payslip.deductions.forEach(deduction => {
       tableHTML += `
 <tr style="background: #fefefa; font-size: 10px;">
-<td colspan="7" style="border: 1px solid #000; padding: 4px 8px; text-align: left; color: #000;">${deduction.name} (${deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value)}):</td>
-<td style="border: 1px solid #000; padding: 4px; text-align: right; color: #000;">-₱${formatCurrency(deductionAmount)}</td>
+<td colspan="7" style="border: 1px solid #000; padding: 4px 8px; text-align: left; color: #000;">${deduction.name} ${deduction.displayValue}:</td>
+<td style="border: 1px solid #000; padding: 4px; text-align: right; color: #000;">${deduction.amount}</td>
 </tr>`
     })
 
-    // Total deductions and net pay
+    // Total deductions and net pay using unified data
     tableHTML += `
 <tr style="background: #fff3cd; font-weight: bold;">
-<td colspan="7" style="border: 1px solid #000; padding: 6px 8px; text-align: left; font-size: 11px; color: #000;">TOTAL DEDUCTIONS:</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right; color: #000;">-₱${formatCurrency(totalDeductions.value)}</td>
+<td colspan="7" style="border: 1px solid #000; padding: 6px 8px; text-align: left; font-size: 11px; color: #000;">${payslip.totalsDeductions.label}:</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: right; color: #000;">${payslip.totalsDeductions.amount}</td>
 </tr>
 <tr style="background: #d1ecf1; font-weight: bold; border: 2px solid #28a745;">
 <td colspan="7" style="border: 2px solid #28a745; padding: 8px; text-align: left; font-size: 12px; color: #000;">NET PAY:</td>
-<td style="border: 2px solid #28a745; padding: 8px; text-align: right; font-size: 14px; color: #000;">₱${formatCurrency(netPay.value)}</td>
+<td style="border: 2px solid #28a745; padding: 8px; text-align: right; font-size: 14px; color: #000;">${payslip.totals.netPay}</td>
 </tr>`
   } else {
     // Original table structure when no deductions
     tableHTML += `
 <tr style="background: #e0e0e0; font-weight: bold;">
 <td colspan="4" style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">TOTAL PAY:</td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 14px;">${totalBags.value}</td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 14px;">${payslip.totals.totalBags}</td>
 <td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
-<td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 14px;">₱${formatCurrency(totalPay.value)}</td>
+<td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 14px;">${payslip.totals.grossPay}</td>
 </tr>`
   }
 
@@ -1386,6 +1550,9 @@ const savePayslip = async () => {
       console.error('Local storage fallback failed:', localError)
       alert('❌ Error: All save methods failed. Please try again.')
     }
+
+    // 🔄 TRIGGER GLOBAL REFRESH: Refresh all payslip data across app
+    triggerRefresh('payslips')
   }
 }
 
@@ -1900,7 +2067,10 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* Modal Styles */
+/* ==========================================================================
+   MODAL STYLES & FORM ELEMENTS
+   ========================================================================== */
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1976,6 +2146,356 @@ onMounted(() => {
 
 .modal-body {
   padding: 2rem;
+}
+
+/* Enhanced Form Styles for Deductions Modal */
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Enhanced Input Fields */
+.deduction-input,
+.deduction-select {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: white;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  min-height: 44px; /* Better touch targets */
+}
+
+.deduction-input::placeholder {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.deduction-input:focus,
+.deduction-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  transform: translateY(-1px);
+}
+
+.deduction-input:hover,
+.deduction-select:hover {
+  border-color: #d1d5db;
+}
+
+/* Custom Select Styling */
+.deduction-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+  padding-right: 2.5rem;
+  cursor: pointer;
+}
+
+.deduction-select:focus {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+}
+
+/* Form Actions & Buttons */
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: 2px solid;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  min-width: 120px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+/* Primary Add Button - Bright Green */
+.btn-add {
+  border-color: #059669;
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
+}
+
+.btn-add:hover {
+  background: linear-gradient(135deg, #047857 0%, #0f766e 100%);
+  border-color: #047857;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+}
+
+.btn-add:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+/* Edit Button - Warm Orange/Apricot */
+.btn-edit {
+  border-color: #ea580c;
+  background: linear-gradient(135deg, #ea580c 0%, #c2410c 50%, #9a3412 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(234, 88, 12, 0.2);
+}
+
+.btn-edit:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #ea580c 50%, #b91c1c 100%);
+  border-color: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4);
+}
+
+/* Clear Button - Cool Blue */
+.btn-clear {
+  border-color: #2563eb;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.btn-clear:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  border-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+/* Manage Button - Professional Purple */
+.btn-manage {
+  border-color: #7c3aed;
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(124, 58, 237, 0.2);
+}
+
+.btn-manage:hover {
+  background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%);
+  border-color: #6d28d9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
+}
+
+.btn-manage:active {
+  transform: translateY(0);
+}
+
+/* Destructive Buttons - Vivid Red */
+.btn-delete,
+.btn-remove {
+  border-color: #dc2626;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: white;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
+}
+
+.btn-delete:hover,
+.btn-remove:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+  border-color: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+}
+
+/* Management Section */
+.management-controls {
+  margin-bottom: 1rem;
+}
+
+.btn-manage {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Saved Deductions List */
+.saved-deductions-list,
+.deductions-list {
+  margin-top: 1.5rem;
+}
+
+.no-saved-deductions {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  padding: 2rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.saved-deduction-item,
+.deduction-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.saved-deduction-item:hover,
+.deduction-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: #d1d5db;
+}
+
+.deduction-details,
+.deduction-name,
+.deduction-value {
+  color: #374151;
+}
+
+.deduction-actions,
+.deduction-actions-right {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-edit,
+.btn-delete,
+.btn-remove {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  min-width: auto;
+}
+
+/* Auto-deductions list */
+.auto-deduction-item {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.auto-deduction-item:last-child {
+  border-bottom: none;
+}
+
+/* Percentage and Amount Type Indicators */
+.percentage-type {
+  color: #059669;
+  font-weight: 600;
+}
+
+.amount-type {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* Quick Add Templates */
+.deduction-templates {
+  margin-top: 1rem;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.btn-template {
+  padding: 0.875rem;
+  background: #f8fafc;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #374151;
+  transition: all 0.2s ease;
+  text-align: center;
+  cursor: pointer;
+}
+
+.btn-template:hover {
+  background: #e0f2fe;
+  border-color: #0ea5e9;
+  color: #0ea5e9;
+  transform: translateY(-1px);
+}
+
+.btn-template small {
+  display: block;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+/* Auto-Applied Info Box */
+.auto-deductions-info {
+  margin-bottom: 1.5rem;
+}
+
+.info-box {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 1rem;
+  color: #065f46;
+}
+
+.info-box h4 {
+  margin: 0 0 0.5rem 0;
+  color: #047857;
+}
+
+/* Responsive Form Styles */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    margin: 10px;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .btn {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .template-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .saved-deduction-item,
+  .deduction-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .deduction-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 /* Ultra-Compact Mobile-First Design */

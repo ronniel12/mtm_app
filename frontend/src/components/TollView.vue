@@ -129,6 +129,7 @@
                   min="0"
                   :value="trip.actualTollExpense || ''"
                   @input="updateActualToll(trip.id, $event.target.value)"
+                  @paste="handleTollPaste($event, trip.id, 'actual')"
                   @blur="saveActualToll(trip.id)"
                   class="toll-input-inline"
                   placeholder="Actual Toll"
@@ -447,11 +448,39 @@ const recalculateToll = async (trip) => {
   await calculateTollForTrip(trip)
 }
 
+// Helper function to clean currency input values
+const cleanCurrencyInput = (value) => {
+  if (!value) return ''
+
+  let cleaned = value.toString()
+    .replace(/[₱$€£¥₹₽₩₦₨₪₫₡₵₺₴₸₼₲₱₭₯₰₳₶₷₹₻₽₾₿]/g, '') // Remove currency symbols
+    .replace(/\s+/g, '') // Remove extra spaces
+    .trim()
+
+  // Handle different number formats
+  // If there's a comma and a period, assume comma is thousands separator and period is decimal
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    // Remove commas (thousands separators)
+    cleaned = cleaned.replace(/,/g, '')
+  }
+  // If there's only a comma at the end (European decimal), convert to period
+  else if (cleaned.includes(',') && !cleaned.includes('.') && cleaned.split(',')[1] && cleaned.split(',')[1].length <= 2) {
+    cleaned = cleaned.replace(',', '.')
+  }
+  // If there's only commas (thousands separators), remove them
+  else if (cleaned.includes(',') && !cleaned.includes('.')) {
+    cleaned = cleaned.replace(/,/g, '')
+  }
+
+  return cleaned
+}
+
 // Update roundtrip toll
 const updateRoundtripToll = (tripId, value) => {
   const trip = trips.value.find(t => t.id === tripId)
   if (trip) {
-    trip.roundtripToll = parseFloat(value) || 0
+    const cleanedValue = cleanCurrencyInput(value)
+    trip.roundtripToll = parseFloat(cleanedValue) || 0
   }
 }
 
@@ -489,11 +518,42 @@ const saveRoundtripToll = async (tripId) => {
 
 
 
+// Handle paste events for toll inputs to properly parse currency values
+const handleTollPaste = (event, tripId, field) => {
+  event.preventDefault() // Prevent default paste behavior
+
+  // Get the raw clipboard data
+  const clipboardData = event.clipboardData || window.clipboardData
+  const pastedText = clipboardData.getData('text')
+
+  // Clean the pasted value
+  const cleanedValue = cleanCurrencyInput(pastedText)
+  const numericValue = parseFloat(cleanedValue) || 0
+
+  // Update the trip data
+  const trip = trips.value.find(t => t.id === tripId)
+  if (trip) {
+    if (field === 'actual') {
+      trip.actualTollExpense = numericValue
+      // Auto-save
+      saveActualToll(tripId)
+    } else if (field === 'roundtrip') {
+      trip.roundtripToll = numericValue
+      // Auto-save
+      saveRoundtripToll(tripId)
+    }
+  }
+
+  // Update the input field value
+  event.target.value = numericValue
+}
+
 // Update actual toll expense
 const updateActualToll = (tripId, value) => {
   const trip = trips.value.find(t => t.id === tripId)
   if (trip) {
-    trip.actualTollExpense = parseFloat(value) || 0
+    const cleanedValue = cleanCurrencyInput(value)
+    trip.actualTollExpense = parseFloat(cleanedValue) || 0
   }
 }
 
@@ -547,16 +607,17 @@ const selectRouteForTrip = (tripId, routeIndex) => {
   saveComputedToll(tripId)
 }
 
-// Calculate variance between computed and actual toll
-const calculateVariance = (computed, actual) => {
-  return (parseFloat(actual) - parseFloat(computed)).toFixed(2)
+// Calculate variance between actual and roundtrip toll
+const calculateVariance = (roundtrip, actual) => {
+  const variance = parseFloat(actual) - parseFloat(roundtrip)
+  return Math.abs(variance).toFixed(2)
 }
 
 // Get variance class for styling
 const getVarianceClass = (roundtrip, actual) => {
-  const variance = parseFloat(calculateVariance(roundtrip, actual))
-  if (variance > 0) return 'variance-negative' // Cost savings = green
-  if (variance < 0) return 'variance-positive' // Cost overrun = red
+  const variance = parseFloat(actual) - parseFloat(roundtrip)
+  if (variance < 0) return 'variance-savings' // Actual < roundtrip = bright green (savings)
+  if (variance > 0) return 'variance-overrun' // Actual > roundtrip = red (overrun)
   return 'variance-zero'
 }
 
@@ -579,7 +640,7 @@ const totalVariance = computed(() => {
     const roundtrip = parseFloat(trip.roundtripToll) || 0
     const actual = parseFloat(trip.actualTollExpense) || 0
     if (roundtrip && actual) {
-      return sum + (roundtrip - actual)
+      return sum + (actual - roundtrip)
     }
     return sum
   }, 0).toFixed(2)
@@ -587,8 +648,8 @@ const totalVariance = computed(() => {
 
 const totalVarianceClass = computed(() => {
   const variance = parseFloat(totalVariance.value)
-  if (variance > 0) return 'variance-negative' // Cost savings = green
-  if (variance < 0) return 'variance-positive' // Cost overrun = red
+  if (variance > 0) return 'variance-overrun' // Cost overrun = red
+  if (variance < 0) return 'variance-savings' // Cost savings = green
   return 'variance-zero'
 })
 
@@ -1399,14 +1460,20 @@ const getDuplicateTooltip = (trip) => {
   border-radius: 2px;
 }
 
-.variance-positive {
-  color: #dc3545;
-  font-weight: 600;
-}
-
-.variance-negative {
+.variance-savings {
   color: #28a745;
   font-weight: 600;
+  background: rgba(40, 167, 69, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.variance-overrun {
+  color: #dc3545;
+  font-weight: 600;
+  background: rgba(220, 53, 69, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
 }
 
 .variance-zero {

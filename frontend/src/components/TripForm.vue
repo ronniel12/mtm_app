@@ -167,7 +167,15 @@
         </div>
 
         <div class="form-group">
-          <!-- Empty slot for alignment -->
+          <label for="foodAllowance">Food Allowance</label>
+          <input
+            id="foodAllowance"
+            v-model="displayFoodAllowance"
+            type="text"
+            readonly
+            class="form-input"
+            placeholder="Calculated automatically per day"
+          />
         </div>
       </div>
 
@@ -189,6 +197,10 @@
 import { ref, reactive, watch, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '@/api/config'
+import { useDataRefresh } from '../composables/useDataRefresh'
+
+// Initialize global refresh system
+const { triggerRefresh } = useDataRefresh()
 
 const props = defineProps({
   editTrip: {
@@ -298,6 +310,9 @@ const submitForm = async () => {
       await axios.post(`${API_BASE_URL}/trips`, data)
       alert('Trip added successfully!')
     }
+
+    // 📡 TRIGGER GLOBAL REFRESH: Notify all trip-related components to refresh
+    triggerRefresh('trips')
 
     emit('tripAdded')
     resetForm()
@@ -494,6 +509,11 @@ const formatDateForInput = (dateString) => {
     return ''
   }
 }
+
+// Computed property to display food allowance (read-only)
+const displayFoodAllowance = computed(() => {
+  return '₱450.00 (per day) - Calculated automatically'
+})
 
 
 </script>

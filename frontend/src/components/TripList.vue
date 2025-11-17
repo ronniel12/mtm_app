@@ -57,6 +57,7 @@
             <th>Origin</th>
             <th>Destination</th>
             <th>Bags</th>
+
             <th>Rate/Unit</th>
             <th>Total</th>
             <th>Driver</th>
@@ -290,9 +291,24 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, inject, onUnmounted } from 'vue'
 import axios from 'axios'
 import { API_BASE_URL } from '@/api/config'
+import { useDataRefresh } from '../composables/useDataRefresh'
+
+// Add these lines >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+const { triggerRefresh, onRefresh } = useDataRefresh()
+
+// 📡 Listen for external trip operations (create/update from TripForm)
+onRefresh('trips', async () => {
+  console.log('🔄 TripList: External trip modification detected - refreshing...')
+  await fetchData()
+  console.log('✅ TripList: Refreshed due to external changes')
+})
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+// Inject global functions
+const { openEditTripDialog } = inject('globalEditTrip')
 
 const trips = ref([])
 const dateFilter = ref('')
@@ -495,8 +511,9 @@ const selectTrip = (trip) => {
   emit('tripSelected', trip)
 }
 
+// Use the global edit trip function injected from App.vue
 const editTrip = (trip) => {
-  emit('tripEdit', trip)
+  openEditTripDialog(trip)
 }
 
 const deleteTrip = async (tripId) => {
@@ -511,7 +528,10 @@ const deleteTrip = async (tripId) => {
           selectedTrip.value = null
         }
 
-        // Emit event to trigger the same refresh logic as create/update
+        // 🔄 TRIGGER GLOBAL REFRESH: Refresh all trip data across app
+        triggerRefresh('trips')
+
+        // Emit local event for backward compatibility
         emit('tripDeleted')
       } catch (error) {
         console.error('❌ Error deleting trip:', error)

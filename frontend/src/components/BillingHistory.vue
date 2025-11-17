@@ -218,6 +218,10 @@
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '@/api/config'
+import { useDataRefresh } from '../composables/useDataRefresh'
+
+// Initialize global refresh system
+const { onRefresh } = useDataRefresh()
 
 const billings = ref([])
 const filteredBillings = ref([])
@@ -657,6 +661,13 @@ ${tableHTML}
 }
 
 
+
+// 📡 Listen for billing creation/deletion events to refresh the list
+onRefresh('billings', async () => {
+  console.log('🔄 Billing refresh triggered - reloading billings...')
+  await fetchBillings()
+  console.log('✅ Billing history refreshed')
+})
 
 // Lifecycle
 onMounted(async () => {

@@ -1,163 +1,41 @@
 <script setup>
-import { ref, computed } from 'vue'
-import TripList from './components/TripList.vue'
+import { ref, provide } from 'vue'
+import { useRouter } from 'vue-router'
 import TripForm from './components/TripForm.vue'
-import RatesLookup from './components/RatesLookup.vue'
-import Settings from './components/Settings.vue'
-import DashboardCharts from './components/DashboardCharts.vue'
-import BillingView from './components/BillingView.vue'
-import BillingHistory from './components/BillingHistory.vue'
-import PayrollView from './components/PayrollView.vue'
-import PayslipHistory from './components/PayslipHistory.vue'
-import TollView from './components/TollView.vue'
-import ExpensesView from './components/ExpensesView.vue'
-import Maintenance from './components/Maintenance.vue'
-import axios from 'axios'
-import { API_BASE_URL } from '@/api/config'
 
-const showForm = ref(false)
-const activeSection = ref('dashboard')
-const refreshKey = ref(0)
-const editTrip = ref(null)
-const showHistory = ref(false)
+const router = useRouter()
+
+// Restore the edit trip functionality that was removed
+const showEditTripDialog = ref(false)
+const editTripData = ref(null)
 const mobileMenuOpen = ref(false)
-const billingTab = ref('create')
-const payrollTab = ref('create')
-const tripListRef = ref(null)
 
-const trips = ref([])
-const employees = ref([])
-const isLoading = ref(true)
-const error = ref(null)
+// Global edit trip functions (needed for TripList communication)
+const openEditTripDialog = (trip) => {
+  editTripData.value = trip
+  showEditTripDialog.value = true
+}
 
-const totalRates = computed(() => {
-  if (trips.value.length === 0) return 0
-  const sum = trips.value.reduce((acc, trip) => acc + (trip.rate || 0), 0)
-  return Math.round(sum / trips.value.length)
+const closeEditTripDialog = () => {
+  showEditTripDialog.value = false
+  editTripData.value = null
+}
+
+const handleTripEditComplete = () => {
+  showEditTripDialog.value = false
+  editTripData.value = null
+  // Emit event or provide function to refresh data in other components
+  // This will be handled by the individual components that need to refresh
+}
+
+// Provide global functions to child components
+provide('globalEditTrip', {
+  openEditTripDialog,
+  closeEditTripDialog,
+  handleTripEditComplete
 })
 
-const setActiveSection = (section) => {
-  activeSection.value = section
-  showForm.value = false
-  editTrip.value = null
-  showHistory.value = false // Reset history view when switching sections
-}
 
-const toggleForm = () => {
-  showForm.value = !showForm.value
-  if (!showForm.value) {
-    editTrip.value = null
-  }
-}
-
-const onTripAdded = async () => {
-  console.log('🔄 Trip operation completed, refreshing UI...')
-
-  showForm.value = false
-  editTrip.value = null
-
-  // Force refresh by incrementing the key - this forces TripList re-mount
-  refreshKey.value++
-  console.log('🔄 Forced TripList re-mount with key:', refreshKey.value)
-
-  try {
-    // Refresh dashboard data first
-    await fetchDashboardData()
-    console.log('✅ Dashboard data refreshed')
-
-    // Small delay to ensure component has re-mounted
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    // Reset to page 1 to ensure new trip is visible
-    if (tripListRef.value && typeof tripListRef.value.resetToPage1 === 'function') {
-      tripListRef.value.resetToPage1()
-      console.log('✅ Trip list reset to page 1')
-    }
-
-    // Force another refresh after page reset
-    if (tripListRef.value?.fetchTrips) {
-      await tripListRef.value.fetchTrips()
-      console.log('✅ Trip list refreshed successfully after page reset')
-    } else {
-      console.warn('⚠️ TripList ref not available after re-mount')
-    }
-  } catch (error) {
-    console.error('❌ Error refreshing data after trip operation:', error)
-    // Force refresh even on error
-    refreshKey.value++
-    console.log('🔄 Forced refresh on error')
-  }
-}
-
-const onTripEdit = (trip) => {
-  editTrip.value = trip
-  showForm.value = true
-}
-
-const onTripDeleted = async () => {
-  console.log('🗑️ Trip deleted, refreshing UI...')
-
-  // Force refresh by incrementing the key - this forces TripList re-mount
-  refreshKey.value++
-  console.log('🔄 Forced TripList re-mount with key:', refreshKey.value)
-
-  try {
-    // Refresh dashboard data first
-    await fetchDashboardData()
-    console.log('✅ Dashboard data refreshed after delete')
-
-    // Small delay to ensure component has re-mounted
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    // Reset to page 1 to ensure list is properly updated
-    if (tripListRef.value && typeof tripListRef.value.resetToPage1 === 'function') {
-      tripListRef.value.resetToPage1()
-      console.log('✅ Trip list reset to page 1 after delete')
-    }
-
-    // Force another refresh after page reset with cache busting
-    if (tripListRef.value?.fetchTrips) {
-      await tripListRef.value.fetchTrips(true) // Pass true for forceRefresh
-      console.log('✅ Trip list refreshed successfully after delete (forced)')
-    } else {
-      console.warn('⚠️ TripList ref not available after re-mount')
-    }
-  } catch (error) {
-    console.error('❌ Error refreshing data after delete:', error)
-    // Force refresh even on error
-    refreshKey.value++
-    console.log('🔄 Forced refresh on delete error')
-  }
-}
-
-const fetchDashboardData = async () => {
-  try {
-    isLoading.value = true
-    error.value = null
-
-    // Use optimized endpoint that includes pre-calculated rates
-    const [tripsRes, employeesRes] = await Promise.all([
-      axios.get(`${API_BASE_URL}/trips/calculated?limit=all`),
-      axios.get(`${API_BASE_URL}/employees`)
-    ])
-
-    // Data is already processed by the API with pre-calculated rates
-    trips.value = tripsRes.data.trips || []
-    employees.value = employeesRes.data
-  } catch (err) {
-    console.error('Error fetching dashboard data:', err)
-    error.value = 'Failed to load dashboard data. Please check if the backend server is running.'
-  } finally {
-    isLoading.value = false
-  }
-}
-
-
-
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  return new Date(dateString).toLocaleDateString()
-}
 
 // Mobile menu functions
 const toggleMobileMenu = () => {
@@ -169,14 +47,9 @@ const closeMobileMenu = () => {
 }
 
 const setActiveSectionMobile = (section) => {
-  activeSection.value = section
-  showForm.value = false
-  editTrip.value = null
-  showHistory.value = false
+  router.push('/' + section)
   mobileMenuOpen.value = false // Close mobile menu after selection
 }
-
-fetchDashboardData()
 </script>
 
 <template>
@@ -202,7 +75,6 @@ fetchDashboardData()
 
       <!-- Desktop Navigation - Left side -->
       <v-tabs
-        v-model="activeSection"
         class="d-none d-md-flex desktop-tabs"
         bg-color="transparent"
         slider-color="white"
@@ -210,39 +82,39 @@ fetchDashboardData()
         density="compact"
         grow
       >
-        <v-tab value="dashboard" @click="setActiveSection('dashboard')" class="nav-tab">
+        <v-tab to="/" class="nav-tab">
           <v-icon size="16" start>mdi-view-dashboard</v-icon>
           <span class="d-none d-md-inline">Dashboard</span>
         </v-tab>
-        <v-tab value="payroll" @click="setActiveSection('payroll')" class="nav-tab">
+        <v-tab to="/payroll" class="nav-tab">
           <v-icon size="16" start>mdi-cash-multiple</v-icon>
           <span class="d-none d-md-inline">Payroll</span>
         </v-tab>
-        <v-tab value="trips" @click="setActiveSection('trips')" class="nav-tab">
+        <v-tab to="/trips" class="nav-tab">
           <v-icon size="16" start>mdi-truck</v-icon>
           <span class="d-none d-md-inline">Trips</span>
         </v-tab>
-        <v-tab value="billing" @click="setActiveSection('billing')" class="nav-tab">
+        <v-tab to="/billing" class="nav-tab">
           <v-icon size="16" start>mdi-receipt</v-icon>
           <span class="d-none d-md-inline">Billing</span>
         </v-tab>
-        <v-tab value="tolls" @click="setActiveSection('tolls')" class="nav-tab">
+        <v-tab to="/tolls" class="nav-tab">
           <v-icon size="16" start>mdi-road-variant</v-icon>
           <span class="d-none d-md-inline">Tolls</span>
         </v-tab>
-        <v-tab value="fuel" @click="setActiveSection('fuel')" class="nav-tab">
+        <v-tab to="/fuel" class="nav-tab">
           <v-icon size="16" start>mdi-gas-station</v-icon>
           <span class="d-none d-md-inline">Fuel</span>
         </v-tab>
-        <v-tab value="expenses" @click="setActiveSection('expenses')" class="nav-tab">
+        <v-tab to="/expenses" class="nav-tab">
           <v-icon size="16" start>mdi-cash-minus</v-icon>
           <span class="d-none d-md-inline">Expenses</span>
         </v-tab>
-        <v-tab value="maintenance" @click="setActiveSection('maintenance')" class="nav-tab">
+        <v-tab to="/maintenance" class="nav-tab">
           <v-icon size="16" start>mdi-wrench</v-icon>
           <span class="d-none d-md-inline">Maintenance</span>
         </v-tab>
-        <v-tab value="settings" @click="setActiveSection('settings')" class="nav-tab">
+        <v-tab to="/settings" class="nav-tab">
           <v-icon size="16" start>mdi-cog</v-icon>
           <span class="d-none d-md-inline">Settings</span>
         </v-tab>
@@ -282,8 +154,7 @@ fetchDashboardData()
       <v-divider />
       <v-list nav class="drawer-list">
         <v-list-item
-          :active="activeSection === 'dashboard'"
-          @click="setActiveSectionMobile('dashboard')"
+          @click="setActiveSectionMobile('')"
           value="dashboard"
           class="drawer-item"
         >
@@ -291,7 +162,6 @@ fetchDashboardData()
           <v-list-item-title>Dashboard</v-list-item-title>
         </v-list-item>
         <v-list-item
-          :active="activeSection === 'payroll'"
           @click="setActiveSectionMobile('payroll')"
           value="payroll"
           class="drawer-item"
@@ -300,7 +170,6 @@ fetchDashboardData()
           <v-list-item-title>Payroll</v-list-item-title>
         </v-list-item>
         <v-list-item
-          :active="activeSection === 'trips'"
           @click="setActiveSectionMobile('trips')"
           value="trips"
           class="drawer-item"
@@ -309,7 +178,6 @@ fetchDashboardData()
           <v-list-item-title>Trips</v-list-item-title>
         </v-list-item>
         <v-list-item
-          :active="activeSection === 'billing'"
           @click="setActiveSectionMobile('billing')"
           value="billing"
           class="drawer-item"
@@ -318,7 +186,6 @@ fetchDashboardData()
           <v-list-item-title>Billing</v-list-item-title>
         </v-list-item>
         <v-list-item
-          :active="activeSection === 'tolls'"
           @click="setActiveSectionMobile('tolls')"
           value="tolls"
           class="drawer-item"
@@ -327,7 +194,6 @@ fetchDashboardData()
           <v-list-item-title>Tolls</v-list-item-title>
         </v-list-item>
         <v-list-item
-          :active="activeSection === 'fuel'"
           @click="setActiveSectionMobile('fuel')"
           value="fuel"
           class="drawer-item"
@@ -336,7 +202,6 @@ fetchDashboardData()
           <v-list-item-title>Fuel</v-list-item-title>
         </v-list-item>
         <v-list-item
-          :active="activeSection === 'expenses'"
           @click="setActiveSectionMobile('expenses')"
           value="expenses"
           class="drawer-item"
@@ -345,7 +210,6 @@ fetchDashboardData()
           <v-list-item-title>Expenses</v-list-item-title>
         </v-list-item>
         <v-list-item
-          :active="activeSection === 'maintenance'"
           @click="setActiveSectionMobile('maintenance')"
           value="maintenance"
           class="drawer-item"
@@ -354,7 +218,6 @@ fetchDashboardData()
           <v-list-item-title>Maintenance</v-list-item-title>
         </v-list-item>
         <v-list-item
-          :active="activeSection === 'settings'"
           @click="setActiveSectionMobile('settings')"
           value="settings"
           class="drawer-item"
@@ -367,140 +230,24 @@ fetchDashboardData()
 
     <!-- Main Content Area -->
     <v-main class="main-content bg-grey-lighten-4">
-      <div class="content-wrapper">
-        <!-- Dashboard Section -->
-        <div v-if="activeSection === 'dashboard'" class="content-section">
-          <div class="section-header mb-3 mb-md-4">
-            <h1 class="text-h5 text-md-h4 mb-2">📊 Dashboard</h1>
-            <p class="text-body-2 text-md-body-1 text-grey">Overview of your logistics operations</p>
-          </div>
-          <div v-if="isLoading" class="loading-state text-center py-6 py-md-8">
-            <v-progress-circular indeterminate color="primary" size="40" />
-            <p class="mt-4 text-body-1">Loading dashboard data...</p>
-          </div>
-          <v-alert v-else-if="error" type="error" class="mb-4 error-alert">
-            <template #prepend><v-icon>mdi-alert-circle</v-icon></template>
-            <h3 class="text-h6 mb-2">Failed to Load Data</h3>
-            <p>{{ error }}</p>
-            <v-btn @click="fetchDashboardData" color="primary" variant="outlined" class="mt-2" size="small">Retry</v-btn>
-          </v-alert>
-          <div v-else class="dashboard-content">
-            <DashboardCharts :trips="trips" :employees="employees" />
-          </div>
-        </div>
-
-        <!-- Trips Section -->
-        <div v-if="activeSection === 'trips'" class="content-section">
-          <div class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center mb-3 mb-md-4 gap-2">
-            <div class="flex-grow-1">
-              <h1 class="text-h5 text-md-h4 mb-2">🚛 Trip Management</h1>
-            </div>
-            <v-btn
-              v-if="!showForm && !editTrip"
-              @click="toggleForm"
-              color="primary"
-              prepend-icon="mdi-plus"
-              size="small"
-              class="action-btn"
-            >
-              <span class="d-none d-sm-inline">New Trip</span>
-              <span class="d-sm-none">New</span>
-            </v-btn>
-          </div>
-          <div v-if="showForm && !editTrip" class="mb-4 mb-md-6">
-            <TripForm :editTrip="editTrip" @tripAdded="onTripAdded" @cancel="toggleForm" />
-          </div>
-          <TripList ref="tripListRef" :key="refreshKey" @tripEdit="onTripEdit" @tripDeleted="onTripDeleted" />
-        </div>
-
-        <!-- Settings Section -->
-        <div v-if="activeSection === 'settings'" class="content-section">
-          <div class="section-header mb-3 mb-md-4">
-            <h1 class="text-h5 text-md-h4 mb-2">⚙️ Settings</h1>
-            <p class="text-body-2 text-md-body-1 text-grey">Manage drivers, helpers, and rates</p>
-          </div>
-          <Settings />
-        </div>
-
-        <!-- Billing Section -->
-        <div v-if="activeSection === 'billing'" class="content-section">
-          <v-tabs v-model="billingTab" class="mb-3 mb-md-4 billing-tabs">
-            <v-tab value="create" class="tab-item">
-              <v-icon start size="16">mdi-plus</v-icon>
-              <span class="d-none d-sm-inline">Create Billing</span>
-              <span class="d-sm-none">Create</span>
-            </v-tab>
-            <v-tab value="history" class="tab-item">
-              <v-icon start size="16">mdi-history</v-icon>
-              <span class="d-none d-sm-inline">Billing History</span>
-              <span class="d-sm-none">History</span>
-            </v-tab>
-          </v-tabs>
-          <v-window v-model="billingTab" class="billing-window">
-            <v-window-item value="create"><BillingView /></v-window-item>
-            <v-window-item value="history"><BillingHistory @switch-to-create="billingTab = 'create'" /></v-window-item>
-          </v-window>
-        </div>
-
-        <!-- Tolls Section -->
-        <div v-if="activeSection === 'tolls'" class="content-section">
-          <TollView />
-        </div>
-
-        <!-- Fuel Section -->
-        <div v-if="activeSection === 'fuel'" class="content-section">
-          <v-card class="pa-3 pa-md-6 text-center fuel-card" elevation="2">
-            <v-icon size="60" size-md="80" color="grey-lighten-1" class="mb-3 mb-md-4">mdi-gas-station</v-icon>
-            <h2 class="text-h6 text-md-h5 mb-2">Fuel Management</h2>
-            <p class="text-body-2 text-md-body-1 text-grey mb-3 mb-md-4">Track fuel consumption and costs</p>
-            <v-alert type="info" variant="tonal" class="fuel-alert">
-              <template #prepend><v-icon>mdi-information</v-icon></template>
-              Fuel Tracker Coming Soon - This section will track fuel purchases, consumption, and efficiency metrics.
-            </v-alert>
-          </v-card>
-        </div>
-
-        <!-- Expenses Section -->
-        <div v-if="activeSection === 'expenses'" class="content-section">
-          <ExpensesView />
-        </div>
-
-        <!-- Maintenance Section -->
-        <div v-if="activeSection === 'maintenance'" class="content-section">
-          <Maintenance />
-        </div>
-
-        <!-- Payroll Section -->
-        <div v-if="activeSection === 'payroll'" class="content-section">
-          <v-tabs v-model="payrollTab" class="mb-3 mb-md-4 payroll-tabs">
-            <v-tab value="create" class="tab-item">
-              <v-icon start size="16">mdi-plus</v-icon>
-              <span class="d-none d-sm-inline">Create Payslip</span>
-              <span class="d-sm-none">Create</span>
-            </v-tab>
-            <v-tab value="history" class="tab-item">
-              <v-icon start size="16">mdi-history</v-icon>
-              <span class="d-none d-sm-inline">Payslip History</span>
-              <span class="d-sm-none">History</span>
-            </v-tab>
-          </v-tabs>
-          <v-window v-model="payrollTab" class="payroll-window">
-            <v-window-item value="create"><PayrollView /></v-window-item>
-            <v-window-item value="history"><PayslipHistory @switch-to-create="payrollTab = 'create'" /></v-window-item>
-          </v-window>
-        </div>
-      </div>
+      <!-- This will render the matched route component -->
+      <router-view />
     </v-main>
 
-    <!-- Edit Trip Dialog -->
-    <v-dialog v-model="editTrip" max-width="90vw" width="800" persistent class="edit-dialog">
+    <!-- Global Edit Trip Dialog -->
+    <v-dialog v-model="showEditTripDialog" max-width="90vw" width="800" persistent class="edit-dialog">
       <v-card>
         <v-card-title class="d-flex align-center pa-3 pa-md-6">
           <v-icon start>mdi-pencil</v-icon>
           <span class="text-h6 text-md-h5">Edit Trip</span>
         </v-card-title>
         <v-card-text class="pa-3 pa-md-6">
-          <TripForm :editTrip="editTrip" @tripAdded="onTripAdded" @cancel="() => editTrip = null" />
+          <TripForm
+            :key="`edit-${editTripData?.id || 'none'}`"
+            :editTrip="editTripData"
+            @tripAdded="handleTripEditComplete"
+            @cancel="closeEditTripDialog"
+          />
         </v-card-text>
       </v-card>
     </v-dialog>

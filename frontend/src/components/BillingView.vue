@@ -139,6 +139,10 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '@/api/config'
+import { useDataRefresh } from '../composables/useDataRefresh'
+
+// Initialize global refresh system
+const { triggerRefresh } = useDataRefresh()
 
 // Data
 const trips = ref([])
@@ -168,6 +172,26 @@ const totalBags = computed(() => {
 })
 
 // Methods
+const getProcessedBillingData = async () => {
+  // Ensure data is loaded/fetched if dates are selected but no filtering has occurred
+  if (filteredTrips.value.length === 0 && startDate.value && endDate.value && validateDates()) {
+    await filterTripsByDate()
+  }
+
+  // Process trips data consistently for all export/display operations
+  return filteredTrips.value.map(trip => ({
+    date: formatDateShort(trip.date),
+    plate: trip.truckPlate,
+    invoice: trip.invoiceNumber,
+    destination: trip.fullDestination,
+    bags: trip.numberOfBags,
+    rate: trip._rate ? formatCurrency(trip._rate) : '0.00',
+    rateFormatted: `₱${trip._rate ? formatCurrency(trip._rate) : '0.00'}`,
+    total: trip._total ? formatCurrency(trip._total) : '0.00',
+    totalFormatted: `₱${trip._total ? formatCurrency(trip._total) : '0.00'}`
+  }))
+}
+
 const formatDate = (dateString) => {
   if (!dateString) return ''
   return new Date(dateString).toLocaleDateString('en-PH')
@@ -215,7 +239,7 @@ const validateDates = () => {
   return true
 }
 
-const exportPDF = () => {
+const exportPDF = async () => {
   // Create a new window for PDF export
   const pdfWindow = window.open('', '_blank')
   if (!pdfWindow) {
@@ -249,32 +273,45 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`
 </thead>
 <tbody>`
 
-  filteredTrips.value.forEach((trip, index) => {
+  const billingData = await getProcessedBillingData()
+
+  billingData.forEach((trip, index) => {
     const bgColor = index % 2 === 1 ? '#fafafa' : 'white'
     tableHTML += `
 <tr style="background: ${bgColor};">
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${formatDateShort(trip.date)}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.truckPlate}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.invoiceNumber}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.fullDestination}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.numberOfBags}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip._rate ? formatCurrency(trip._rate) : '0.00'}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip._total ? formatCurrency(trip._total) : '0.00'}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.date}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.plate}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.invoice}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.destination}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.bags}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: right;">${trip.rateFormatted}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: right;">${trip.totalFormatted}</td>
 </tr>`
   })
 
   tableHTML += `
-<tr style="background: #e0e0e0; font-weight: bold;">
-<td colspan="4" style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">GRAND TOTAL:</td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 14px;">${totalBags.value}</td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
-<td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 14px;">₱${formatCurrency(totalRevenue.value)}</td>
-</tr>
-<tr style="background: white; font-weight: normal;">
-<td colspan="7" style="border: 1px solid #000; padding: 15px 10px; text-align: left; font-size: 14px;"><strong>Prepared by:</strong> ${preparedBy.value || '_______________________________'}</td>
-</tr>
 </tbody>
-</table>`
+</table>
+
+<!-- Totals Row (matching rendered display) -->
+<div style="margin-top: 8px; border-top: 2px solid #000; padding-top: 4px;">
+<table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+<tr style="background: #e0e0e0; font-weight: bold;">
+<td style="border: 1px solid #000; padding: 4px; text-align: left;">GRAND TOTAL:</td>
+<td style="border: 1px solid #000; padding: 4px;"></td>
+<td style="border: 1px solid #000; padding: 4px;"></td>
+<td style="border: 1px solid #000; padding: 4px;"></td>
+<td style="border: 1px solid #000; padding: 4px; text-align: center; font-weight: bold;">${totalBags.value}</td>
+<td style="border: 1px solid #000; padding: 4px;"></td>
+<td style="border: 1px solid #000; padding: 4px; text-align: right; font-weight: bold;">₱${formatCurrency(totalRevenue.value)}</td>
+</tr>
+</table>
+</div>
+
+<!-- Prepared by Section -->
+<div style="margin-top: 30px; font-weight: bold;">
+<strong>Prepared by:</strong> ${preparedBy.value || '_______________________________'}
+</div>`
 
   const printContent = `
 <!DOCTYPE html>
@@ -284,32 +321,34 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`
 <style>
 @media print {
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; color: #000; padding: 20mm; }
-  .company-name-pdf { font-size: 24px; font-weight: bold; text-align: center; letter-spacing: 2px; margin-bottom: 20px; }
-  .company-details-pdf { font-size: 12px; text-align: center; line-height: 1.4; margin-bottom: 20px; }
-  .bill-to-pdf { margin-bottom: 20px; }
-  .bill-to-title { font-weight: bold; font-size: 12px; margin-bottom: 5px; }
-  .bill-to-details { font-size: 11px; line-height: 1.4; margin-bottom: 15px; }
-  .billing-info-pdf { font-size: 11px; margin-bottom: 15px; text-align: left; line-height: 1.4; }
-  @page { size: A4; margin: 25mm; orientation: portrait; }
+  body { font-family: Arial, sans-serif; color: #000; padding: 0; }
+  .company-name-pdf { font-size: 22px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-bottom: 8px; }
+  .company-details-pdf { font-size: 11px; text-align: center; line-height: 1.2; margin-bottom: 10px; }
+  .billing-title-pdf { font-size: 16px; font-weight: bold; text-align: center; margin: 8px 0 12px 0; }
+  .bill-to-pdf { margin-bottom: 8px; }
+  .bill-to-title { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
+  .bill-to-details { font-size: 10px; line-height: 1.2; margin-bottom: 6px; }
+  .billing-info-pdf { font-size: 10px; margin-bottom: 8px; text-align: left; line-height: 1.3; }
+  .prepared-by-pdf { margin-top: 8px; font-size: 12px; font-weight: bold; }
+  @page { size: A4; margin: 15mm; orientation: portrait; }
 }
 </style>
 </head>
-<body style="font-family: Arial, sans-serif; color: #000; background: white; margin: 0; padding: 20px;">
-<div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; text-align: center;">
+<body style="font-family: Arial, sans-serif; color: #000; background: white; margin: 0; padding: 0;">
+<div style="border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 12px; text-align: center;">
 <h1 class="company-name-pdf">MTM ENTERPRISE</h1>
 <div class="company-details-pdf">
 ${companyInfo}
 </div>
-<h2 style="font-size: 18px; font-weight: bold; margin: 15px 0;">BILLING STATEMENT</h2>
+<h2 class="billing-title-pdf">BILLING STATEMENT</h2>
 </div>
 
 <div class="bill-to-pdf">
-<strong style="font-weight: bold;">BILLED TO:</strong><br>
-<div style="margin-top: 5px;">${billToInfo}</div>
+<strong class="bill-to-title">BILLED TO:</strong><br>
+<div class="bill-to-details">${billToInfo}</div>
 </div>
 
-<div class="billing-info-pdf" style="margin-top: 15px; line-height: 1.6;">
+<div class="billing-info-pdf">
 <strong>Billing Number:</strong> ${billingNumber.value}<br>
 <strong>Period Covered:</strong> ${formatPeriod()}<br>
 <strong>Date Generated:</strong> ${formatDate(new Date())}
@@ -330,25 +369,69 @@ ${tableHTML}
   alert('PDF export started! A print dialog will open. Select "Save as PDF" in your browser\'s print dialog to create the PDF file.')
 }
 
-const exportExcel = () => {
-  // Create Excel data
-  const data = [
-    ['DATE', 'PLATE NUMBER', 'INVOICE NUMBER', 'DESTINATION', 'NUMBER OF BAGS', 'RATE PER BAG', 'TOTAL'],
-    ...filteredTrips.value.map(trip => [
-      formatDateShort(trip.date),
-      trip.truckPlate,
-      trip.invoiceNumber,
-      trip.fullDestination,
-      trip.numberOfBags,
-      `₱${trip._rate ? formatCurrency(trip._rate) : '0.00'}`,
-      `₱${trip._total ? formatCurrency(trip._total) : '0.00'}`
-    ]),
-    ['GRAND TOTAL:', '', '', '', totalBags.value, '', `₱${formatCurrency(totalRevenue.value)}`]
-  ]
+const exportExcel = async () => {
+  // Get processed data using the global function
+  const billingData = await getProcessedBillingData()
 
-  // Add prepared by information to CSV data
-  data.push([])
-  data.push(['Prepared by:', preparedBy.value || '_______________________________'])
+  // Ensure we have data
+  if (billingData.length === 0) {
+    alert('No trips to export. Please select a date range with billing data.')
+    return
+  }
+
+  // Create table data for CSV
+  const tableData = billingData.map(trip => [
+    trip.date,
+    trip.plate,
+    trip.invoice,
+    trip.destination,
+    trip.bags,
+    trip.rateFormatted,
+    trip.totalFormatted
+  ]);
+
+  // Create complete data array (company info + bill to + headers + data + totals)
+  const data = [
+    // Company Header Information
+    ['MTM ENTERPRISE', '', '', '', '', '', ''],
+    ['0324 P. Damaso St. Virgen Delas Flores Baliuag Bulacan', '', '', '', '', '', ''],
+    ['TIN # 175-434-337-000', '', '', '', '', '', ''],
+    ['Mobile No. 09605638462 / Telegram No. +358-044-978-8592', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', ''], // Blank row
+    ['BILLING STATEMENT', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', ''], // Blank row
+
+    // Bill To Information
+    ['BILLED TO:', 'Premium Feeds Corp.', '', '', '', '', ''],
+    ['', '798 Maharlika Highway, Dampol 2nd A', '', '', '', '', ''],
+    ['', 'Pulilan Bulacan, 3005', '', '', '', '', ''],
+    ['', 'TIN #007-932-128-000', '', '', '', '', ''],
+    ['', 'Business Style: 007-932-128-000', '', '', '', '', ''],
+    ['', '', '', '', '', '', ''], // Blank row
+
+    // Billing Information
+    ['Billing Number:', billingNumber.value, '', 'Period Covered:', formatPeriod(), 'Date Generated:', formatDate(new Date())],
+    ['', '', '', '', '', '', ''], // Blank row
+
+    // Table Headers
+    ['DATE', 'PLATE NUMBER', 'INVOICE NUMBER', 'DESTINATION', 'NUMBER OF BAGS', 'RATE PER BAG', 'TOTAL'],
+
+    // Blank row after headers
+    ['', '', '', '', '', '', ''],
+
+    // Table Data (using spread operator)
+    ...tableData,
+
+    // Grand Total
+    ['', '', '', '', '', '', ''],
+    ['GRAND TOTAL:', '', '', '', totalBags.value, '', `₱${formatCurrency(totalRevenue.value)}`],
+
+    // Blank row before prepared by
+    ['', '', '', '', '', '', ''],
+
+    // Prepared by information
+    ['Prepared by:', preparedBy.value || '_______________________________', '', '', '', '', '']
+  ];
 
   // Create CSV content
   const csvContent = data.map(row =>
@@ -366,10 +449,19 @@ const exportExcel = () => {
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 
-  alert('Excel export ready! CSV file has been downloaded and can be opened in Excel or similar spreadsheet applications.')
+  alert('Excel export ready! CSV file now includes company details and billing information, and can be opened in Excel or similar spreadsheet applications.')
 }
 
-const printStatement = () => {
+const printStatement = async () => {
+  // Get processed data using the global function
+  const billingData = await getProcessedBillingData()
+
+  // Ensure we have data
+  if (billingData.length === 0) {
+    alert('No trips to print. Please select a date range with billing data.')
+    return
+  }
+
   // Create print-friendly version
   const billToInfo = `Premium Feeds Corp.
 798 Maharlika Highway, Dampol 2nd A
@@ -383,43 +475,57 @@ TIN # 175-434-337-000
 Mobile No. 09605638462 / Telegram No. +358-044-978-8592`.replace(/\n/g, '<br>')
 
   let tableHTML = `
-<table style="width: 100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; margin-top: 20px;">
+<table style="width: 100%; border-collapse: collapse; font-size: 9px; font-family: Arial, sans-serif; margin-top: 8px;">
 <thead>
 <tr style="background: #f0f0f0;">
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">DATE</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">PLATE NUMBER</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">INVOICE NUMBER</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">DESTINATION</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">NUMBER OF BAGS</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">RATE PER BAG</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">TOTAL</th>
+<th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">DATE</th>
+<th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">PLATE NUMBER</th>
+<th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">INVOICE NUMBER</th>
+<th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">DESTINATION</th>
+<th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">NUMBER OF BAGS</th>
+<th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">RATE PER BAG</th>
+<th style="border: 1px solid #000; padding: 3px; text-align: center; font-weight: bold;">TOTAL</th>
 </tr>
 </thead>
 <tbody>`
 
-  filteredTrips.value.forEach((trip, index) => {
+  billingData.forEach((trip, index) => {
     const bgColor = index % 2 === 1 ? '#fafafa' : 'white'
     tableHTML += `
 <tr style="background: ${bgColor};">
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${formatDateShort(trip.date)}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.truckPlate}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.invoiceNumber}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.fullDestination}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.numberOfBags}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip._rate ? formatCurrency(trip._rate) : '0.00'}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip._total ? formatCurrency(trip._total) : '0.00'}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${trip.date}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${trip.plate}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${trip.invoice}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${trip.destination}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: center;">${trip.bags}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: right;">${trip.rateFormatted}</td>
+<td style="border: 1px solid #000; padding: 2px; text-align: right;">${trip.totalFormatted}</td>
 </tr>`
   })
 
   tableHTML += `
-<tr style="background: #e0e0e0; font-weight: bold;">
-<td colspan="4" style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">GRAND TOTAL:</td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 14px;">${totalBags.value}</td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
-<td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 14px;">₱${formatCurrency(totalRevenue.value)}</td>
-</tr>
 </tbody>
-</table>`
+</table>
+
+<!-- Totals Row (matching rendered display) -->
+<div style="margin-top: 20px; border-top: 2px solid #000; padding-top: 10px;">
+<table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+<tr style="background: #e0e0e0; font-weight: bold;">
+<td style="border: 1px solid #000; padding: 10px; text-align: left;">GRAND TOTAL:</td>
+<td style="border: 1px solid #000; padding: 10px;"></td>
+<td style="border: 1px solid #000; padding: 10px;"></td>
+<td style="border: 1px solid #000; padding: 10px;"></td>
+<td style="border: 1px solid #000; padding: 10px; text-align: center; font-weight: bold;">${totalBags.value}</td>
+<td style="border: 1px solid #000; padding: 10px;"></td>
+<td style="border: 1px solid #000; padding: 10px; text-align: right; font-weight: bold;">₱${formatCurrency(totalRevenue.value)}</td>
+</tr>
+</table>
+</div>
+
+<!-- Prepared by Section -->
+<div style="margin-top: 30px; font-weight: bold;">
+<strong>Prepared by:</strong> ${preparedBy.value || '_______________________________'}
+</div>`
 
   const printContent = `
 <!DOCTYPE html>
@@ -431,19 +537,20 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`.replace(/\n/g, '<br>')
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, sans-serif; color: #000; padding: 0; }
   .no-print { display: none; }
-  .company-name-print { font-size: 28px; font-weight: bold; text-align: center; letter-spacing: 2px; margin-bottom: 15px; }
-  .company-details-print { font-size: 14px; text-align: center; line-height: 1.4; margin-bottom: 20px; }
-  .billing-title-print { font-size: 20px; font-weight: bold; text-align: center; margin: 15px 0 20px 0; }
-  .bill-to-print { margin-bottom: 20px; }
-  .bill-to-title-print { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
-  .bill-to-details-print { font-size: 12px; line-height: 1.4; margin-bottom: 15px; }
-  .billing-info-print { font-size: 12px; margin-bottom: 15px; text-align: left; line-height: 1.4; }
-  @page { size: A4; margin: 25mm; }
+  .company-name-print { font-size: 22px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-bottom: 8px; }
+  .company-details-print { font-size: 11px; text-align: center; line-height: 1.2; margin-bottom: 10px; }
+  .billing-title-print { font-size: 16px; font-weight: bold; text-align: center; margin: 8px 0 12px 0; }
+  .bill-to-print { margin-bottom: 8px; }
+  .bill-to-title-print { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
+  .bill-to-details-print { font-size: 10px; line-height: 1.2; margin-bottom: 6px; }
+  .billing-info-print { font-size: 10px; margin-bottom: 8px; text-align: left; line-height: 1.3; }
+  .prepared-by-print { margin-top: 8px; font-size: 12px; font-weight: bold; }
+  @page { size: A4; margin: 15mm; }
 }
 </style>
 </head>
 <body>
-<div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; text-align: center;">
+<div style="border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 12px; text-align: center;">
 <h1 class="company-name-print">MTM ENTERPRISE</h1>
 <div class="company-details-print">
 ${companyInfo}
@@ -466,7 +573,7 @@ ${billToInfo}
 
 ${tableHTML}
 
-<div style="margin-top: 30px; padding: 15px 0; font-size: 14px; font-weight: bold;">
+<div class="prepared-by-print">
 <strong>Prepared by:</strong> ${preparedBy.value || '_______________________________'}
 </div>
 </body>
@@ -658,6 +765,9 @@ const saveBilling = async () => {
       console.error('Local storage fallback failed:', localError)
       alert('Error saving billing. All storage methods failed. Please try again.')
     }
+
+    // 🔄 TRIGGER GLOBAL REFRESH: Refresh all billing data across app
+    triggerRefresh('billings')
   }
 }
 
