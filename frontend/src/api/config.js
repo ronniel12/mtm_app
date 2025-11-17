@@ -37,6 +37,9 @@ export const API_ENDPOINTS = {
   // Expenses
   EXPENSES: `${API_BASE_URL}/expenses`,
 
+  // Fuel
+  FUEL: `${API_BASE_URL}/fuel`,
+
   // Tolls
   TOLLS_CALCULATE: `${API_BASE_URL}/tolls/calculate`
 }

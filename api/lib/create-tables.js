@@ -143,6 +143,26 @@ async function createTables() {
       )
     `);
 
+    // Create fuel table - fresh implementation for fuel tracking
+    // Removed foreign key constraint to allow flexible fuel imports
+    await query(`
+      CREATE TABLE IF NOT EXISTS fuel (
+        id SERIAL PRIMARY KEY,
+        date DATE NOT NULL,
+        liters DECIMAL(10,2) NOT NULL,
+        price_per_liter DECIMAL(10,2) NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        plate_number VARCHAR(20),
+        po_number VARCHAR(50),
+        product VARCHAR(100) DEFAULT 'Diesel',
+        gas_station VARCHAR(200),
+        status VARCHAR(50) DEFAULT 'completed',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Create expenses table
     await query(`
       CREATE TABLE IF NOT EXISTS expenses (
@@ -154,21 +174,46 @@ async function createTables() {
         amount DECIMAL(10,2) NOT NULL,
         payment_method VARCHAR(20) DEFAULT 'cash',
         notes TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Add file attachment columns to existing expenses table
+    // First, add sample vehicle data if empty
     try {
-      await query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_filename TEXT`);
-      await query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_original_name TEXT`);
-      await query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_mimetype VARCHAR(100)`);
-      await query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_size INTEGER`);
-      await query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS receipt_data BYTEA`);
-      console.log('✅ Added file attachment columns to expenses table');
+      const vehicleCount = await query('SELECT COUNT(*) as count FROM vehicles');
+      if (parseInt(vehicleCount.rows[0].count) === 0) {
+        await query(`
+          INSERT INTO vehicles (plate_number, vehicle_class, name)
+          VALUES
+            ('NGU 9174', 'Truck', 'Main Delivery Truck'),
+            ('ABDJ 305', 'Truck', 'Backup Truck'),
+            ('XYZ 123', 'Van', 'Delivery Van'),
+            ('ABC 789', 'Truck', 'Construction Truck')
+        `);
+        console.log('✅ Added sample vehicle data for testing');
+      }
     } catch (error) {
-      console.log('ℹ️ File attachment columns may already exist:', error.message);
+      console.log('ℹ️ Sample vehicles data may already exist:', error.message);
+    }
+
+    // Add sample fuel data if table is empty (for testing)
+    try {
+      const fuelCount = await query('SELECT COUNT(*) as count FROM fuel');
+      if (parseInt(fuelCount.rows[0].count) === 0) {
+        await query(`
+          INSERT INTO fuel (date, liters, price_per_liter, amount, plate_number, po_number, product, gas_station, status, notes)
+          VALUES
+            ('2025-01-15', 50.00, 65.00, 3250.00, 'NGU 9174', 'PO-2025-001', 'Diesel', 'Petron Station', 'completed', 'Weekly truck fuel refill'),
+            ('2025-01-10', 45.50, 66.50, 3027.50, 'ABDJ 305', 'PO-2025-002', 'Diesel', 'Shell Station', 'completed', 'Regular maintenance fuel'),
+            ('2025-01-08', 72.30, 64.80, 4682.64, 'NGU 9174', 'PO-2025-003', 'Diesel', 'Caltex Station', 'completed', 'Long haul trip fuel'),
+            ('2025-01-05', 38.90, 67.20, 2612.08, 'XYZ 123', 'PO-2025-004', 'Premium Gasoline', 'PTT Station', 'completed', 'Delivery van fuel'),
+            ('2025-01-02', 55.75, 65.90, 3674.43, 'ABC 789', 'PO-2025-005', 'Diesel', 'Petron Station', 'completed', 'Construction equipment fuel')
+        `);
+        console.log('✅ Added sample fuel data for testing');
+      }
+    } catch (error) {
+      console.log('ℹ️ Sample fuel data may already exist:', error.message);
     }
 
     // ============================================================================
@@ -331,11 +376,20 @@ async function createTables() {
     await query('CREATE INDEX IF NOT EXISTS idx_vehicles_vehicle_class ON vehicles(vehicle_class)');
     await query('CREATE INDEX IF NOT EXISTS idx_vehicles_created_at ON vehicles(created_at DESC)');
 
+    // Fuel table indexes
+    await query('CREATE INDEX IF NOT EXISTS idx_fuel_date ON fuel(date DESC)');
+    await query('CREATE INDEX IF NOT EXISTS idx_fuel_plate_number ON fuel(plate_number)');
+    await query('CREATE INDEX IF NOT EXISTS idx_fuel_gas_station ON fuel(gas_station)');
+    await query('CREATE INDEX IF NOT EXISTS idx_fuel_status ON fuel(status)');
+    await query('CREATE INDEX IF NOT EXISTS idx_fuel_created_at ON fuel(created_at DESC)');
+
     // Expenses table indexes
     await query('CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date DESC)');
     await query('CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)');
     await query('CREATE INDEX IF NOT EXISTS idx_expenses_vehicle ON expenses(vehicle)');
     await query('CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON expenses(created_at DESC)');
+
+
 
     // Maintenance system indexes
     await query('CREATE INDEX IF NOT EXISTS idx_maintenance_schedules_vehicle_id ON maintenance_schedules(vehicle_id)');
