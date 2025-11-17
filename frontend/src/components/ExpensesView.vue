@@ -55,10 +55,34 @@
         </div>
       </div>
       <div class="summary-card">
-        <div class="card-icon">📊</div>
+        <div class="card-icon">🍔</div>
         <div class="card-content">
-          <h3>Avg per Trip</h3>
-          <p class="amount">{{ formatCurrency(avgPerTrip) }}</p>
+          <h3>Food Allowance</h3>
+          <p class="amount">{{ formatCurrency(foodAllowanceTotal) }}</p>
+          <span class="period">This Month</span>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="card-icon">🚧</div>
+        <div class="card-content">
+          <h3>Tolls</h3>
+          <p class="amount">{{ formatCurrency(tollsTotal) }}</p>
+          <span class="period">This Month</span>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="card-icon">💰</div>
+        <div class="card-content">
+          <h3>Salary</h3>
+          <p class="amount">{{ formatCurrency(salaryTotal) }}</p>
+          <span class="period">This Month</span>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="card-icon">🏢</div>
+        <div class="card-content">
+          <h3>Admin</h3>
+          <p class="amount">{{ formatCurrency(adminTotal) }}</p>
           <span class="period">This Month</span>
         </div>
       </div>
@@ -312,12 +336,16 @@ import { API_BASE_URL, API_ENDPOINTS } from '@/api/config'
 // Reactive data
 const expenses = ref([])
 const vehicles = ref([])
+const employees = ref([])
+const ratesData = ref([])
 const showAddExpense = ref(false)
 const editingExpense = ref(null)
 const selectedCategory = ref('')
 const selectedMonth = ref(new Date().toISOString().slice(0, 7)) // Current month
 const selectedFile = ref(null)
 const existingAttachment = ref(null)
+const fuelData = ref([])
+const tripsData = ref([])
 
 // Form data
 const expenseForm = ref({
@@ -348,26 +376,182 @@ const filteredExpenses = computed(() => {
   return filtered.sort((a, b) => new Date(b.date) - new Date(a.date))
 })
 
+const filteredFuel = computed(() => {
+  if (!selectedMonth.value) return fuelData.value
+
+  return fuelData.value.filter(fuel => {
+    // The fuel date comes as a string in YYYY-MM-DD format
+    const fuelMonth = fuel.date ? fuel.date.substring(0, 7) : new Date(fuel.createdAt).toISOString().slice(0, 7)
+    return fuelMonth === selectedMonth.value
+  })
+})
+
+const filteredTrips = computed(() => {
+  if (!selectedMonth.value) return tripsData.value
+
+  return tripsData.value.filter(trip => {
+    // The trip date comes as a string in YYYY-MM-DD format
+    const tripMonth = trip.date ? trip.date.substring(0, 7) : new Date(trip.createdAt).toISOString().slice(0, 7)
+    return tripMonth === selectedMonth.value
+  })
+})
+
 const totalExpenses = computed(() => {
-  return filteredExpenses.value.reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0)
+  // Sum all summary card totals + expenses in "others" category
+  const summaryCardTotals = fuelTotal.value + maintenanceTotal.value + foodAllowanceTotal.value +
+                           tollsTotal.value + salaryTotal.value + adminTotal.value
+
+  const othersTotal = filteredExpenses.value
+    .filter(expense => expense.category === 'others')
+    .reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0)
+
+  return summaryCardTotals + othersTotal
 })
 
 const fuelTotal = computed(() => {
-  return filteredExpenses.value
-    .filter(expense => expense.category === 'fuel')
-    .reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0)
+  return filteredFuel.value.reduce((sum, fuel) => sum + parseFloat(fuel.amount || 0), 0)
 })
 
 const maintenanceTotal = computed(() => {
+  const maintenanceCategories = ['parts', 'labor', 'services', 'parking_fee']
   return filteredExpenses.value
-    .filter(expense => expense.category === 'maintenance')
+    .filter(expense => maintenanceCategories.includes(expense.category))
     .reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0)
 })
 
-const avgPerTrip = computed(() => {
-  // This would need trip data to calculate properly
-  // For now, return a placeholder calculation
-  return totalExpenses.value / 10 // Placeholder: assume 10 trips per month
+const tollsTotal = computed(() => {
+  return filteredExpenses.value
+    .filter(expense => expense.category === 'rfid_service_charge')
+    .reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0)
+})
+
+// Helper functions for salary calculation (same as PayrollView)
+const calculateTripRates = (tripsArray, ratesData) => {
+  tripsArray.forEach(trip => {
+    const destination = trip.destination || trip.fullDestination || ''
+    let foundRate = null
+
+    // Parse destination string in format "Aringay - La Union"
+    const destinationParts = destination.split(' - ')
+    if (destinationParts.length === 2) {
+      const townName = destinationParts[0].trim()
+      const provinceName = destinationParts[1].trim()
+
+      // Find exact town + province combination
+      const exactMatch = ratesData.find(rate =>
+        (rate.town?.toLowerCase() === townName.toLowerCase()) &&
+        (rate.province?.toLowerCase() === provinceName.toLowerCase())
+      )
+
+      if (exactMatch) {
+        foundRate = exactMatch.new_rates || exactMatch.rates
+      }
+    }
+
+    // Store on trip object
+    trip._rate = foundRate
+  })
+
+  return tripsArray
+}
+
+const expandEmployeeTrips = (trips, selectedEmployeeUuid = null) => {
+  const expandedTrips = []
+
+  trips.forEach(trip => {
+    // Driver salary only if driver is actually assigned
+    if (trip.driver && (!selectedEmployeeUuid || trip.driver === selectedEmployeeUuid)) {
+      expandedTrips.push({
+        ...trip,
+        _role: 'D', // Driver marker
+        _commission: 0.11,
+      })
+    }
+
+    // Helper salary ONLY if helper is actually assigned (not null/empty)
+    if (trip.helper && trip.helper !== trip.driver &&
+        (!selectedEmployeeUuid || trip.helper === selectedEmployeeUuid)) {
+      expandedTrips.push({
+        ...trip,
+        _role: 'H', // Helper marker
+        _commission: 0.10,
+      })
+    }
+  })
+
+  return expandedTrips
+}
+
+const salaryTotal = computed(() => {
+  // Debug logs removed - calculation is now clean and correct
+
+  if (!employees.value.length || !tripsData.value.length || !ratesData.value.length) {
+  // Keep only this minimal debug for data issues
+    return 0
+  }
+
+
+
+  let totalSalary = 0
+
+  // Process trips with rate data first
+  const processedTrips = calculateTripRates([...tripsData.value], ratesData.value)
+
+  // Process each employee separately - calculate their salary directly from raw trips
+  employees.value.forEach(employee => {
+    let employeeMonthlySalary = 0
+
+    // Process trips where this employee participated (either driver or helper)
+    const employeeParticipatedTrips = processedTrips.filter(trip => {
+      // Check date range first
+      const tripDate = new Date(trip.date)
+      const selectedMonthObj = new Date(selectedMonth.value + '-01')
+      const isInSelectedMonth = tripDate.getFullYear() === selectedMonthObj.getFullYear() &&
+                               tripDate.getMonth() === selectedMonthObj.getMonth()
+
+      // Check if employee participated as driver OR helper
+      const isDriver = trip.driver === employee.uuid
+      const isHelper = trip.helper === employee.uuid
+
+      return isInSelectedMonth && (isDriver || isHelper)
+    })
+
+    // Calculate salary for each trip this employee participated in
+    employeeParticipatedTrips.forEach(trip => {
+      const isDriver = trip.driver === employee.uuid
+      const isHelper = trip.helper === employee.uuid
+
+      // Employee gets paid for their specific role
+      if (isDriver) {
+        // Calculate driver salary for this trip
+        const adjustedRate = trip._rate - 4
+        const driverPay = (adjustedRate * trip.numberOfBags) * 0.11 // 11% commission
+        employeeMonthlySalary += driverPay
+      }
+
+      if (isHelper) {
+        // Calculate helper salary for this trip
+        const adjustedRate = trip._rate - 4
+        const helperPay = (adjustedRate * trip.numberOfBags) * 0.10 // 10% commission
+        employeeMonthlySalary += helperPay
+      }
+    })
+
+    totalSalary += employeeMonthlySalary
+  })
+
+  return totalSalary
+})
+
+const adminTotal = computed(() => {
+  const adminCategories = ['coordinator', 'bookkeeping', 'office_supplies']
+  return filteredExpenses.value
+    .filter(expense => adminCategories.includes(expense.category))
+    .reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0)
+})
+
+const foodAllowanceTotal = computed(() => {
+  return filteredTrips.value.reduce((sum, trip) => sum + parseFloat(trip.foodAllowance || 0), 0)
 })
 
 // Methods
@@ -411,6 +595,60 @@ const fetchVehicles = async () => {
     console.error('Error fetching vehicles:', error)
     // Fallback to empty array if API fails
     vehicles.value = []
+  }
+}
+
+const fetchEmployees = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/employees`)
+    employees.value = response.data || []
+  } catch (error) {
+    console.error('Error fetching employees:', error)
+    // Fallback to empty array if API fails
+    employees.value = []
+  }
+}
+
+const fetchRates = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/rates`)
+    ratesData.value = response.data || []
+  } catch (error) {
+    console.error('Error fetching rates data:', error)
+    // Fallback to empty array if API fails
+    ratesData.value = []
+  }
+}
+
+const fetchFuelData = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/fuel`)
+    fuelData.value = response.data.fuel || []
+  } catch (error) {
+    console.error('Error fetching fuel data:', error)
+    // Fallback to empty array if API fails
+    fuelData.value = []
+  }
+}
+
+const fetchTripsData = async () => {
+  try {
+    // The API requires startDate and endDate, so fetch a broad range to get all trips
+    const params = {
+      startDate: '2020-01-01',
+      endDate: '2030-12-31',
+      limit: 'all' // Fetch all trips within date range
+    }
+
+    const response = await axios.get(`${API_BASE_URL}/trips`, { params })
+
+    // The trips API returns { trips: [...], pagination: {...} }
+    tripsData.value = response.data.trips || []
+
+  } catch (error) {
+    console.error('Error fetching trips data:', error)
+    // Fallback to empty array if API fails
+    tripsData.value = []
   }
 }
 
@@ -637,6 +875,10 @@ const getCategoryLabel = (category) => {
 onMounted(() => {
   fetchExpenses()
   fetchVehicles()
+  fetchEmployees()
+  fetchRates()
+  fetchFuelData()
+  fetchTripsData()
 })
 </script>
 
