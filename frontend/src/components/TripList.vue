@@ -407,7 +407,11 @@ const filteredTrips = computed(() => {
 
   if (!dateFilter.value) {
     // Sort all trips by date (newest first) when no filter applied
-    return filtered.sort((a, b) => new Date(b.date) - new Date(a.date))
+    return filtered.sort((a, b) => {
+      const aDate = parseDateNeutral(a.date) || new Date(0)
+      const bDate = parseDateNeutral(b.date) || new Date(0)
+      return bDate - aDate
+    })
   }
 
   const now = new Date()
@@ -428,12 +432,16 @@ const filteredTrips = computed(() => {
   }
 
   filtered = trips.value.filter(trip => {
-    const tripDate = new Date(trip.date)
+    const tripDate = parseDateNeutral(trip.date) || new Date(0)
     return tripDate >= startDate
   })
 
   // Sort filtered results by date (newest first)
-  return filtered.sort((a, b) => new Date(b.date) - new Date(a.date))
+  return filtered.sort((a, b) => {
+    const aDate = parseDateNeutral(a.date) || new Date(0)
+    const bDate = parseDateNeutral(b.date) || new Date(0)
+    return bDate - aDate
+  })
 })
 
 // Pagination computed properties
@@ -544,14 +552,29 @@ const resetToPage1 = () => {
   currentPage.value = 1
 }
 
+// Helper function to parse date strings without timezone effects
+const parseDateNeutral = (dateString) => {
+  if (!dateString) return null
+  // Parse YYYY-MM-DD format manually and create date at noon UTC to prevent timezone shifting
+  const parts = dateString.split('-')
+  if (parts.length === 3) {
+    // Create date at exactly noon UTC: Year, Month-1, Day, Hour=12, Min=0, Sec=0, MS=0
+    // This prevents dates from shifting based on local timezone or access time
+    return new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0, 0))
+  }
+  // Fallback to original parsing if not in expected format
+  return new Date(dateString)
+}
+
 const formatDate = (dateString) => {
   if (!dateString) return ''
-  // Database now stores timestamps in local timezone (UTC+2)
-  // Display as-is without additional timezone conversion
-  return new Date(dateString).toLocaleDateString('en-PH', {
+  // Use timezone-neutral parsing for consistent display
+  const date = parseDateNeutral(dateString)
+  return date.toLocaleDateString('en-PH', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
+    day: 'numeric',
+    timeZone: 'UTC'  // Force UTC interpretation for true timezone neutrality
   })
 }
 

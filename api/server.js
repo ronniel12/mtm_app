@@ -179,31 +179,6 @@ app.get('/api/trips', async (req, res) => {
     }
 
     const transformedTrips = result.rows.map(trip => {
-      // Convert all timestamps to local time for display (add 2 hours for Helsinki)
-      // PostgreSQL stores as UTC, so we need to add 2 hours for Helsinki time
-      const createdAtDate = new Date(trip.created_at);
-      const updatedAtDate = new Date(trip.updated_at);
-
-      // Always add 2 hours to convert from UTC to Helsinki time
-      const localCreatedAt = new Date(createdAtDate.getTime() + (2 * 60 * 60 * 1000));
-      const localUpdatedAt = new Date(updatedAtDate.getTime() + (2 * 60 * 60 * 1000));
-
-      const adjustedCreatedAt = localCreatedAt.getFullYear() + '-' +
-        String(localCreatedAt.getMonth() + 1).padStart(2, '0') + '-' +
-        String(localCreatedAt.getDate()).padStart(2, '0') + ' ' +
-        String(localCreatedAt.getHours()).padStart(2, '0') + ':' +
-        String(localCreatedAt.getMinutes()).padStart(2, '0') + ':' +
-        String(localCreatedAt.getSeconds()).padStart(2, '0') + '.' +
-        String(localCreatedAt.getMilliseconds()).padStart(3, '0') + '+02';
-
-      const adjustedUpdatedAt = localUpdatedAt.getFullYear() + '-' +
-        String(localUpdatedAt.getMonth() + 1).padStart(2, '0') + '-' +
-        String(localUpdatedAt.getDate()).padStart(2, '0') + ' ' +
-        String(localUpdatedAt.getHours()).padStart(2, '0') + ':' +
-        String(localUpdatedAt.getMinutes()).padStart(2, '0') + ':' +
-        String(localUpdatedAt.getSeconds()).padStart(2, '0') + '.' +
-        String(localUpdatedAt.getMilliseconds()).padStart(3, '0') + '+02';
-
       return {
         id: trip.id,
         trackingNumber: trip.tracking_number,
@@ -221,8 +196,8 @@ app.get('/api/trips', async (req, res) => {
         helper: trip.helper,
         numberOfBags: trip.number_of_bags,
         foodAllowance: trip.food_allowance,
-        createdAt: adjustedCreatedAt,
-        updatedAt: adjustedUpdatedAt,
+        createdAt: trip.created_at,
+        updatedAt: trip.updated_at,
         computedToll: trip.computed_toll,
         roundtripToll: trip.roundtrip_toll,
         actualTollExpense: trip.actual_toll_expense
@@ -290,12 +265,12 @@ app.get('/api/trips/calculated', async (req, res) => {
       let tripsQuery, countQuery, tripsParams, countParams;
 
       // Regular paginated query (with optional search)
-      tripsQuery = `SELECT * FROM trips ${searchCondition} ORDER BY id DESC LIMIT $${searchParams.length + 1} OFFSET $${searchParams.length + 2}`;
+      tripsQuery = `SELECT *, date::text as date FROM trips ${searchCondition} ORDER BY trips.date DESC LIMIT $${searchParams.length + 1} OFFSET $${searchParams.length + 2}`;
       countQuery = `SELECT COUNT(*) as total FROM trips ${searchCondition}`;
       tripsParams = [...searchParams, limit, offset];
       countParams = searchParams;
 
-      // Get data first (usually faster)
+    // Get data first (usually faster)
       const tripsResult = await query(tripsQuery, tripsParams);
 
       // Get fresh count (no caching in serverless environments)
@@ -323,27 +298,6 @@ app.get('/api/trips/calculated', async (req, res) => {
 
       // Process trips with pre-calculated rates
       const processedTrips = trips.map(trip => {
-        // Convert timestamps to local time
-        const createdAtDate = new Date(trip.created_at);
-        const updatedAtDate = new Date(trip.updated_at);
-        const localCreatedAt = new Date(createdAtDate.getTime() + (2 * 60 * 60 * 1000));
-        const localUpdatedAt = new Date(updatedAtDate.getTime() + (2 * 60 * 60 * 1000));
-
-        const adjustedCreatedAt = localCreatedAt.getFullYear() + '-' +
-          String(localCreatedAt.getMonth() + 1).padStart(2, '0') + '-' +
-          String(localCreatedAt.getDate()).padStart(2, '0') + ' ' +
-          String(localCreatedAt.getHours()).padStart(2, '0') + ':' +
-          String(localCreatedAt.getMinutes()).padStart(2, '0') + ':' +
-          String(localCreatedAt.getSeconds()).padStart(2, '0') + '.' +
-          String(localCreatedAt.getMilliseconds()).padStart(3, '0') + '+02';
-
-        const adjustedUpdatedAt = localUpdatedAt.getFullYear() + '-' +
-          String(localUpdatedAt.getMonth() + 1).padStart(2, '0') + '-' +
-          String(localUpdatedAt.getDate()).padStart(2, '0') + ' ' +
-          String(localUpdatedAt.getHours()).padStart(2, '0') + ':' +
-          String(localUpdatedAt.getMinutes()).padStart(2, '0') + ':' +
-          String(localUpdatedAt.getSeconds()).padStart(2, '0') + '.' +
-          String(localUpdatedAt.getMilliseconds()).padStart(3, '0') + '+02';
 
         // Calculate rate for this trip
         let foundRate = null;
@@ -387,8 +341,8 @@ app.get('/api/trips/calculated', async (req, res) => {
           helper: trip.helper,
           helperName: helperName,
           numberOfBags: trip.number_of_bags,
-          createdAt: adjustedCreatedAt,
-          updatedAt: adjustedUpdatedAt,
+          createdAt: trip.created_at,
+          updatedAt: trip.updated_at,
           computedToll: trip.computed_toll,
           roundtripToll: trip.roundtrip_toll,
           actualTollExpense: trip.actual_toll_expense,
@@ -417,7 +371,7 @@ app.get('/api/trips/calculated', async (req, res) => {
     const countQuery = `SELECT COUNT(*) as total FROM trips ${searchCondition}`;
     const countResult = await query(countQuery, searchParams);
     const total = parseInt(countResult.rows[0].total);
-    const tripsResult = await query(`SELECT * FROM trips ${searchCondition} ORDER BY id DESC`, searchParams);
+    const tripsResult = await query(`SELECT * FROM trips ${searchCondition} ORDER BY date DESC`, searchParams);
 
     // Get all rates for calculation (cached)
     const ratesCacheKey = 'rates:all';
@@ -439,27 +393,6 @@ app.get('/api/trips/calculated', async (req, res) => {
 
     // Process trips with pre-calculated rates
     const processedTrips = tripsResult.rows.map(trip => {
-      // Convert timestamps to local time
-      const createdAtDate = new Date(trip.created_at);
-      const updatedAtDate = new Date(trip.updated_at);
-      const localCreatedAt = new Date(createdAtDate.getTime() + (2 * 60 * 60 * 1000));
-      const localUpdatedAt = new Date(updatedAtDate.getTime() + (2 * 60 * 60 * 1000));
-
-      const adjustedCreatedAt = localCreatedAt.getFullYear() + '-' +
-        String(localCreatedAt.getMonth() + 1).padStart(2, '0') + '-' +
-        String(localCreatedAt.getDate()).padStart(2, '0') + '-' +
-        String(localCreatedAt.getHours()).padStart(2, '0') + ':' +
-        String(localCreatedAt.getMinutes()).padStart(2, '0') + ':' +
-        String(localCreatedAt.getSeconds()).padStart(2, '0') + '.' +
-        String(localCreatedAt.getMilliseconds()).padStart(3, '0') + '+02';
-
-      const adjustedUpdatedAt = localUpdatedAt.getFullYear() + '-' +
-        String(localUpdatedAt.getMonth() + 1).padStart(2, '0') + '-' +
-        String(localUpdatedAt.getDate()).padStart(2, '0') + ' ' +
-        String(localUpdatedAt.getHours()).padStart(2, '0') + ':' +
-        String(localUpdatedAt.getMinutes()).padStart(2, '0') + ':' +
-        String(localUpdatedAt.getSeconds()).padStart(2, '0') + '.' +
-        String(localUpdatedAt.getMilliseconds()).padStart(3, '0') + '+02';
 
       // Calculate rate for this trip
       let foundRate = null;
@@ -503,8 +436,8 @@ app.get('/api/trips/calculated', async (req, res) => {
         helper: trip.helper,
         helperName: helperName,
         numberOfBags: trip.number_of_bags,
-        createdAt: adjustedCreatedAt,
-        updatedAt: adjustedUpdatedAt,
+          createdAt: trip.created_at,
+          updatedAt: trip.updated_at,
         computedToll: trip.computed_toll,
         roundtripToll: trip.roundtrip_toll,
         actualTollExpense: trip.actual_toll_expense,

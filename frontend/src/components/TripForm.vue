@@ -487,23 +487,27 @@ const hideSuggestions = () => {
   }, 150)
 }
 
-// Helper function to format date for HTML date input (YYYY-MM-DD)
+// Helper function to format date for HTML date input (YYYY-MM-DD) - timezone-neutral
 const formatDateForInput = (dateString) => {
   if (!dateString) return ''
 
   try {
-    // Create a date object from the string
-    const date = new Date(dateString)
+    // Parse YYYY-MM-DD format manually and create UTC date at noon to prevent timezone shifting
+    const parts = dateString.split('-')
+    if (parts.length === 3) {
+      // Create date at noon UTC: Year, Month-1, Day, Hour=12, Min=0, Sec=0, MS=0
+      // This prevents timezone conversion issues when populating the date input field
+      const utcDate = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0, 0))
 
-    // Check if the date is valid
-    if (isNaN(date.getTime())) return ''
+      // Extract date components in UTC to maintain timezone neutrality
+      const year = utcDate.getUTCFullYear()
+      const month = String(utcDate.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(utcDate.getUTCDate()).padStart(2, '0')
 
-    // Format as YYYY-MM-DD in local timezone to avoid timezone shift
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
 
-    return `${year}-${month}-${day}`
+    return ''
   } catch (error) {
     console.error('Error formatting date for input:', error)
     return ''

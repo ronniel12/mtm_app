@@ -12,6 +12,7 @@ const pool = new Pool({
   idleTimeoutMillis: 10000, // Reduced for faster cleanup
   connectionTimeoutMillis: 10000, // Consistent timeout
   maxUses: 7500, // Reset connections periodically
+  timezone: 'UTC', // Force UTC timezone to prevent date conversion issues
 });
 
 // Test the connection
