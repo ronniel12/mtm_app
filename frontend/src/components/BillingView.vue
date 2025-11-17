@@ -809,6 +809,9 @@ const fetchBillingData = async () => {
     // Calculate rates and totals for trips
     calculateTripRates(mappedTrips, mappedRates)
 
+    // Sort trips by date in ascending order (earliest to latest)
+    mappedTrips.sort((a, b) => new Date(a.date) - new Date(b.date))
+
     trips.value = mappedTrips
     filteredTrips.value = [...mappedTrips] // Show filtered trips
 
