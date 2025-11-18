@@ -479,28 +479,24 @@ const formatCurrency = (amount) => {
 
 /* Print Styles */
 @media print {
-  .payslip-preview {
-    max-width: none;
-    margin: 0;
-    padding: 1rem;
-  }
-
-  .payroll-controls {
-    display: none;
-  }
-
-  .company-name {
-    font-size: 2rem;
-  }
-
-  .ledger-table {
-    font-size: 0.75rem;
-  }
-
-  .header-row th,
-  .data-row td {
-    padding: 0.5rem 0.25rem;
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  .payslip-preview { font-family: 'Courier New', monospace; color: #000; padding: 6mm 5mm; font-size: 9px; line-height: 1.2; }
+  .payroll-controls { display: none; }
+  .company-name-small { font-size: 14px; font-weight: bold; margin: 3px 0; letter-spacing: 1px; }
+  .company-details-small { font-size: 8px; line-height: 1.1; margin-bottom: 5px; }
+  .company-details-small p { margin: 1px 0; }
+  .payroll-statement-title { font-size: 12px; font-weight: bold; margin: 4px 0; letter-spacing: 1px; }
+  .employee-info-section { margin-bottom: 8px; font-size: 8px; }
+  .company-logo-large { width: 60px; height: 60px; }
+  .payroll-statement-title { font-size: 0.75rem; }
+  @page { size: A4; margin: 8mm; }
+  .payroll-table { font-size: 7px; border: 1px solid #000; }
+  .payroll-table .header-row th { padding: 2px 1px; font-size: 6px; }
+  .payroll-table .data-row td { padding: 1px 1px; font-size: 7px; }
+  .totals-row td { padding: 3px 1px; font-size: 8px; }
+  .total-deductions-row td { padding: 3px 1px; font-size: 8px; }
+  .net-pay-row td { padding: 4px 1px; font-size: 9px; }
+  .individual-deduction-row td { padding: 2px 1px; font-size: 7px; }
 }
 
 /* Responsive Design */

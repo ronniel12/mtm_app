@@ -1320,14 +1320,14 @@ ${payslip.company.contact}`.replace(/\n/g, '<br>')
 <style>
 @media print {
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; color: #000; padding: 20mm 15mm; }
+  body { font-family: 'Courier New', monospace; color: #000; padding: 8mm 6mm; font-size: 9px; line-height: 1.2; }
   .no-print { display: none; }
-  .company-name-print { font-size: 20px; font-weight: bold; text-align: center; letter-spacing: 2px; margin-bottom: 10px; }
-  .company-details-print { font-size: 10px; text-align: center; line-height: 1.2; margin-bottom: 15px; }
-  .payroll-title-print { font-size: 16px; font-weight: bold; text-align: center; margin: 10px 0 15px 0; }
-  .employee-info-print { font-size: 10px; margin-bottom: 10px; text-align: left; line-height: 1.3; }
+  .company-name-print { font-size: 14px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-bottom: 6px; }
+  .company-details-print { font-size: 8px; text-align: center; line-height: 1.1; margin-bottom: 8px; }
+  .payroll-title-print { font-size: 12px; font-weight: bold; text-align: center; margin: 6px 0 8px 0; }
+  .employee-info-print { font-size: 8px; margin-bottom: 6px; text-align: left; line-height: 1.2; }
   .header-row { background: #f0f0f0 !important; page-break-after: avoid; }
-  @page { size: A4; margin: 15mm; }
+  @page { size: A4; margin: 8mm; }
 }
 </style>
 </head>

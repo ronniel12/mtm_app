@@ -546,11 +546,12 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`
 <style>
 @media print {
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; color: #000; padding: 20mm; }
-  .company-name-print { font-size: 24px; font-weight: bold; text-align: center; letter-spacing: 2px; margin-bottom: 20px; }
-  .company-details-print { font-size: 12px; text-align: center; line-height: 1.4; margin-bottom: 20px; }
-  .employee-info-print { margin-bottom: 15px; font-size: 12px; }
-  @page { size: A4; margin: 25mm; orientation: portrait; }
+  body { font-family: 'Courier New', monospace; color: #000; padding: 6mm 5mm; font-size: 9px; line-height: 1.2; }
+  .company-name-print { font-size: 14px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-bottom: 5px; }
+  .company-details-print { font-size: 8px; text-align: center; line-height: 1.1; margin-bottom: 8px; }
+  .company-details-print p { margin: 1px 0; }
+  .employee-info-print { margin-bottom: 6px; font-size: 8px; }
+  @page { size: A4; margin: 8mm; orientation: portrait; }
 }
 </style>
 </head>
