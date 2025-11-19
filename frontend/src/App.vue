@@ -1,13 +1,37 @@
 <script setup>
-import { ref, provide } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, provide, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import TripForm from './components/TripForm.vue'
 
 const router = useRouter()
+const route = useRoute()
+
+// Check if current route is employee-only
+const isEmployeeRoute = computed(() => {
+  return route.path && route.path.startsWith('/employee/')
+})
 
 // Restore the edit trip functionality that was removed
 const showEditTripDialog = ref(false)
 const editTripData = ref(null)
+
+// Restore the add trip functionality that was removed
+const showAddTripDialog = ref(false)
+
+// Global add trip functions (newly restored)
+const openAddTripDialog = () => {
+  showAddTripDialog.value = true
+}
+
+const closeAddTripDialog = () => {
+  showAddTripDialog.value = false
+}
+
+const handleTripAddComplete = () => {
+  showAddTripDialog.value = false
+  // Reset any form data if needed
+}
+
 const mobileMenuOpen = ref(false)
 
 // Global edit trip functions (needed for TripList communication)
@@ -35,6 +59,13 @@ provide('globalEditTrip', {
   handleTripEditComplete
 })
 
+// Provide global add trip functions
+provide('globalAddTrip', {
+  openAddTripDialog,
+  closeAddTripDialog,
+  handleTripAddComplete
+})
+
 
 
 // Mobile menu functions
@@ -53,9 +84,10 @@ const setActiveSectionMobile = (section) => {
 </script>
 
 <template>
-  <v-app class="app-container">
-    <!-- App Bar - Fixed at top -->
+  <v-app :class="{ 'app-container': true, 'employee-route': isEmployeeRoute }">
+    <!-- App Bar - Only show for admin routes -->
     <v-app-bar
+      v-if="!isEmployeeRoute"
       app
       color="primary"
       dark
@@ -131,8 +163,9 @@ const setActiveSectionMobile = (section) => {
       </v-toolbar-title>
     </v-app-bar>
 
-    <!-- Mobile Navigation Drawer -->
+    <!-- Mobile Navigation Drawer - Only show for admin routes -->
     <v-navigation-drawer
+      v-if="!isEmployeeRoute"
       v-model="mobileMenuOpen"
       temporary
       location="left"
@@ -233,6 +266,23 @@ const setActiveSectionMobile = (section) => {
       <!-- This will render the matched route component -->
       <router-view />
     </v-main>
+
+    <!-- Global Add Trip Dialog -->
+    <v-dialog v-model="showAddTripDialog" max-width="90vw" width="800" persistent class="edit-dialog">
+      <v-card>
+        <v-card-title class="d-flex align-center pa-3 pa-md-6">
+          <v-icon start>mdi-plus</v-icon>
+          <span class="text-h6 text-md-h5">Add New Trip</span>
+        </v-card-title>
+        <v-card-text class="pa-3 pa-md-6">
+          <TripForm
+            :key="`add-${Date.now()}`"
+            @tripAdded="handleTripAddComplete"
+            @cancel="closeAddTripDialog"
+          />
+        </v-card-text>
+      </v-card>
+    </v-dialog>
 
     <!-- Global Edit Trip Dialog -->
     <v-dialog v-model="showEditTripDialog" max-width="90vw" width="800" persistent class="edit-dialog">
@@ -388,10 +438,16 @@ html, body {
 .main-content {
   width: 100vw;
   min-height: calc(100vh - 64px);
-  padding-top: 80px !important; /* Account for fixed app bar + spacing */
+  padding-top: 80px !important; /* Account for fixed app bar + spacing for admin routes */
   background: #f8fafc;
   position: relative;
   z-index: 1;
+}
+
+/* Employee routes don't have admin navigation, so remove padding-top */
+.employee-route .main-content {
+  padding-top: 0 !important;
+  min-height: 100vh;
 }
 
 .content-wrapper {

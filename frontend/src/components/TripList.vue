@@ -37,6 +37,14 @@
           <option value="month">Trips this Month</option>
           <option value="year">Trips this Year</option>
         </select>
+
+        <button @click="openAddTripDialog" class="btn-add-trip" title="Add New Trip">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add Trip
+        </button>
       </div>
     </div>
 
@@ -309,6 +317,7 @@ onRefresh('trips', async () => {
 
 // Inject global functions
 const { openEditTripDialog } = inject('globalEditTrip')
+const { openAddTripDialog } = inject('globalAddTrip')
 
 const trips = ref([])
 const dateFilter = ref('')
@@ -876,6 +885,28 @@ defineExpose({
 .filters select:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.btn-add-trip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 10px 16px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: auto;
+}
+
+.btn-add-trip:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
 }
 
 /* Search Results Info */
