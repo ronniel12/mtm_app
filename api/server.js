@@ -8,6 +8,7 @@ const NodeCache = require('node-cache');
 const multer = require('multer');
 const compression = require('compression');
 const { query } = require('./lib/db');
+const PDFService = require('./pdf-service');
 require('dotenv').config();
 
 // Initialize cache (15 minutes TTL for reference data)
@@ -1107,6 +1108,181 @@ app.put('/api/employees/:uuid', jsonParser, async (req, res) => {
   }
 });
 
+// Employee PIN management endpoints
+app.put('/api/employees/:uuid/pin', jsonParser, async (req, res) => {
+  try {
+    const { pin } = req.body;
+
+    // Validate 4-digit PIN
+    if (!pin || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN must be exactly 4 digits' });
+    }
+
+    // Check if PIN is already used by another employee
+    const existingResult = await query('SELECT uuid FROM employees WHERE access_pin = $1 AND uuid != $2', [pin, req.params.uuid]);
+    if (existingResult.rows.length > 0) {
+      return res.status(400).json({ error: 'This PIN is already in use by another employee' });
+    }
+
+    const result = await query(`
+      UPDATE employees
+      SET access_pin = $1, updated_at = CURRENT_TIMESTAMP
+      WHERE uuid = $2
+      RETURNING *
+    `, [pin, req.params.uuid]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // Clear employees cache
+    cache.del('employees:all');
+
+    console.log('Updated employee PIN for:', result.rows[0].name);
+    res.json({ message: 'PIN updated successfully', employee: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating employee PIN:', error);
+    res.status(500).json({ error: 'Failed to update employee PIN' });
+  }
+});
+
+// Employee payslips access via PIN
+app.get('/api/employee/:pin/payslips', async (req, res) => {
+  try {
+    const { pin } = req.params;
+
+    // Validate PIN format
+    if (!pin || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ error: 'Invalid PIN format' });
+    }
+
+    // Find employee by PIN
+    const employeeResult = await query('SELECT * FROM employees WHERE access_pin = $1', [pin]);
+    if (employeeResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Employee not found or invalid PIN' });
+    }
+
+    const employee = employeeResult.rows[0];
+
+    // Get all payslips for this employee with period data
+    const payslipsResult = await query(`
+      SELECT *, period_start::text as period_start, period_end::text as period_end FROM payslips
+      WHERE employee_uuid = $1
+      ORDER BY created_date DESC
+    `, [employee.uuid]);
+
+    // Process payslips with Blob URLs if available
+    const processedPayslips = payslipsResult.rows.map(payslip => {
+      let details = {};
+      try {
+        // JSONB is already parsed by pg, so use directly
+        details = payslip.details || {};
+      } catch (parseError) {
+        console.warn(`Failed to parse payslip details for ${payslip.id}:`, parseError.message);
+        details = {};
+      }
+
+      // Build comprehensive deductions array including employee-specific deductions
+      let comprehensiveDeductions = details.deductions ? [...details.deductions] : [];
+
+      // Add employee-specific deductions if not already included
+      // Cash Advance (if auto-deduct is enabled and amount > 0)
+      if (employee.cash_advance && employee.cash_advance > 0 && employee.auto_deduct_cash_advance) {
+        const cashAdvanceDeduction = {
+          name: 'Cash Advance',
+          type: 'employee',
+          calculatedAmount: parseFloat(employee.cash_advance),
+          isEmployeeSpecific: true
+        };
+        comprehensiveDeductions.push(cashAdvanceDeduction);
+      }
+
+      // Loans (if auto-deduct is enabled and amount > 0)
+      if (employee.loans && employee.loans > 0 && employee.auto_deduct_loans) {
+        const loanDeduction = {
+          name: 'Loans',
+          type: 'employee',
+          calculatedAmount: parseFloat(employee.loans),
+          isEmployeeSpecific: true
+        };
+        comprehensiveDeductions.push(loanDeduction);
+      }
+
+      // Recalculate total deductions from comprehensive list
+      const totalCalculatedDeductions = comprehensiveDeductions.reduce((sum, deduction) =>
+        sum + (parseFloat(deduction.calculatedAmount) || 0), 0
+      );
+      const recalculatedNetPay = (parseFloat(payslip.gross_pay) || 0) - totalCalculatedDeductions;
+
+      // Format period properly for display with database fallback
+      let formattedPeriod = 'N/A';
+
+      // First try to use period from details JSON if available
+      if (details.period && details.period.periodText) {
+        formattedPeriod = details.period.periodText;
+      }
+      else if (details.period && details.period.startDate && details.period.endDate) {
+        const start = new Date(details.period.startDate).toLocaleDateString('en-PH', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        const end = new Date(details.period.endDate).toLocaleDateString('en-PH', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        formattedPeriod = `${start} to ${end}`;
+      }
+      else if (typeof details.period === 'string') {
+        formattedPeriod = details.period;
+      }
+      // Fall back to database period_start/period_end fields
+      else if (payslip.period_start && payslip.period_end) {
+        const start = new Date(payslip.period_start).toLocaleDateString('en-PH', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        const end = new Date(payslip.period_end).toLocaleDateString('en-PH', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        formattedPeriod = `${start} to ${end}`;
+      }
+
+      return {
+        id: payslip.id,
+        payslipNumber: payslip.payslip_number,
+        employeeName: employee.name,
+        period: formattedPeriod,
+        grossPay: payslip.gross_pay,
+        deductions: comprehensiveDeductions,
+        totalDeductions: totalCalculatedDeductions,
+        netPay: Math.max(0, recalculatedNetPay), // Ensure net pay can't be negative
+        createdDate: payslip.created_date,
+        status: payslip.status,
+        blobUrl: details.blobUrl || null, // Add Blob URL directly to top level
+        // Include trip summary and other details for employee view
+        trips: details.trips || [],
+        totals: details.totals || {}
+      };
+    });
+
+    res.json({
+      employee: {
+        name: employee.name,
+        id: employee.uuid
+      },
+      payslips: processedPayslips
+    });
+  } catch (error) {
+    console.error('Error fetching employee payslips:', error);
+    res.status(500).json({ error: 'Failed to fetch payslips' });
+  }
+});
+
 app.delete('/api/employees/:uuid', async (req, res) => {
   try {
     const result = await query('DELETE FROM employees WHERE uuid = $1 RETURNING *', [req.params.uuid]);
@@ -1459,6 +1635,36 @@ app.get('/api/payslips/:id', async (req, res) => {
   }
 });
 
+// PDF download endpoint for payslips
+app.get('/api/payslips/:id/download', async (req, res) => {
+  try {
+    const result = await query('SELECT details FROM payslips WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Payslip not found' });
+    }
+
+    const payslip = result.rows[0];
+    let details;
+    try {
+      // JSONB is already parsed by pg, so use directly
+      details = payslip.details || {};
+    } catch (parseError) {
+      console.warn(`Failed to parse payslip details for ${req.params.id}:`, parseError.message);
+      details = {};
+    }
+
+    if (!details.blobUrl) {
+      return res.status(404).json({ message: 'PDF not available for this payslip' });
+    }
+
+    // Redirect to the blob URL
+    res.redirect(details.blobUrl);
+  } catch (error) {
+    console.error('Error downloading payslip PDF:', error);
+    res.status(500).json({ error: 'Failed to download payslip PDF' });
+  }
+});
+
 app.post('/api/payslips', jsonParser, async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
@@ -1469,6 +1675,32 @@ app.post('/api/payslips', jsonParser, async (req, res) => {
       return res.status(400).json({ error: 'Request body is required' });
     }
 
+    // Generate PDF synchronously (works in serverless)
+    let pdfResult = null;
+    try {
+      console.log('📄 Generating PDF synchronously for payslip:', body.payslipNumber);
+      pdfResult = await PDFService.generateAndUploadPDF(body);
+      console.log('✅ PDF generated:', pdfResult.pdfGenerated ? pdfResult.blobUrl : 'Failed');
+    } catch (pdfError) {
+      console.error('❌ PDF generation failed during payslip creation:', pdfError.message);
+      pdfResult = { pdfGenerated: false, error: pdfError.message };
+    }
+
+    // Build details with PDF result
+    const payslipDetails = {
+      ...body,
+      ...(pdfResult && pdfResult.pdfGenerated ? {
+        blobUrl: pdfResult.blobUrl,
+        pdfGenerated: true,
+        pdfFilename: pdfResult.filename,
+        pdfSize: pdfResult.size
+      } : {
+        pdfGenerated: false,
+        pdfError: pdfResult?.error || 'Unknown PDF error'
+      })
+    };
+
+    // Create the payslip record with PDF URL embedded
     const result = await query(`
       INSERT INTO payslips (id, payslip_number, employee_uuid, period_start, period_end, gross_pay, deductions, net_pay, status, created_date, details)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -1484,7 +1716,7 @@ app.post('/api/payslips', jsonParser, async (req, res) => {
       parseFloat(body.totals?.netPay || body.net_pay || 0),
       body.status || 'pending',
       body.createdDate || new Date().toISOString(),
-      JSON.stringify(body)
+      JSON.stringify(payslipDetails)
     ]);
 
     console.log('Created new payslip:', body.payslipNumber);
@@ -3151,6 +3383,88 @@ app.get('/api/maintenance/dashboard', async (req, res) => {
   } catch (error) {
     console.error('Error fetching maintenance dashboard:', error);
     res.status(500).json({ error: 'Failed to fetch maintenance dashboard' });
+  }
+});
+
+// Test PDF generation and blob upload endpoint
+app.post('/api/test/pdf', jsonParser, async (req, res) => {
+  try {
+    console.log('🧪 Starting PDF generation test with blob upload');
+
+    // Create mock payslip data for testing
+    const mockPayslipData = {
+      id: 'TEST-' + Date.now(),
+      payslipNumber: 'TEST-001',
+      employee: {
+        uuid: 'test-employee-uuid',
+        name: 'Test Employee Name'
+      },
+      period: {
+        startDate: '2025-01-01',
+        endDate: '2025-01-31',
+        periodText: 'January 2025'
+      },
+      totals: {
+        grossPay: 35000.00,
+        totalDeductions: 2500.00,
+        netPay: 32500.00
+      },
+      deductions: [
+        { name: 'SSS Share', calculatedAmount: 500.00, type: 'standard' },
+        { name: 'PhilHealth', calculatedAmount: 400.00, type: 'standard' },
+        { name: 'Pag-IBIG', calculatedAmount: 200.00, type: 'standard' },
+        { name: 'Cash Advance', calculatedAmount: 1400.00, type: 'employee', isEmployeeSpecific: true }
+      ],
+      trips: [
+        {
+          date: '2025-01-15',
+          truckPlate: 'TEST-PLATE',
+          invoiceNumber: 'INV-001',
+          destination: 'Test Destination',
+          rate: 450.00,
+          bags: 10,
+          total: 4500.00
+        },
+        {
+          date: '2025-01-20',
+          truckPlate: 'TEST-PLATE',
+          invoiceNumber: 'INV-002',
+          destination: 'Another Destination',
+          rate: 420.00,
+          bags: 8,
+          total: 3360.00
+        }
+      ],
+      createdDate: new Date().toISOString()
+    };
+
+    console.log('📄 Testing PDF generation with mock data...');
+
+    // Test the complete PDF workflow
+    const pdfResult = await PDFService.generateAndUploadPDF(mockPayslipData);
+
+    console.log('✅ PDF test completed - Results:', JSON.stringify(pdfResult, null, 2));
+
+    res.json({
+      success: pdfResult.pdfGenerated,
+      message: pdfResult.pdfGenerated ?
+        'PDF generated and uploaded to Vercel Blob successfully!' :
+        'PDF generation/upload failed',
+      result: pdfResult,
+      testData: {
+        urlAccessible: pdfResult.pdfGenerated ? `${pdfResult.blobUrl}` : null,
+        note: 'If successful, you can visit the blobUrl directly to download the PDF'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ PDF test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'PDF test failed with error',
+      error: error.message,
+      stack: error.stack
+    });
   }
 });
 

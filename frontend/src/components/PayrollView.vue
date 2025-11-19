@@ -1505,8 +1505,48 @@ const savePayslip = async () => {
     systemVersion: '2.0' // Mark as new system version
   }
 
-  // Ensure the data is serializable by creating a deep copy without Vue reactivity
-  const serializableData = JSON.parse(JSON.stringify(payslipData))
+  // Create a safe serializable copy without dangerous JSON.parse(JSON.stringify())
+  // which causes "[object Object]" corruption when objects contain circular references
+  const safeSerialize = (obj) => {
+    try {
+      // First attempt: basic JSON serialization test
+      JSON.stringify(obj)
+      return obj // Return as-is if serializable
+    } catch (error) {
+      console.warn('Object not fully serializable:', error.message)
+      // Fallback: create a clean copy with only serializable properties
+      return {
+        id: obj.id,
+        payslipNumber: obj.payslipNumber,
+        period: obj.period,
+        employee: obj.employee,
+        trips: obj.trips?.map(t => ({
+          id: t.id,
+          date: t.date,
+          truckPlate: t.truckPlate,
+          invoiceNumber: t.invoiceNumber,
+          destination: t.fullDestination,
+          numberOfBags: t.numberOfBags,
+          _role: t._role,
+          _commission: t._commission,
+          adjustedRate: t._rate ? t._rate - 4 : 0,
+          rate: t._rate
+        })) || [],
+        totals: obj.totals,
+        deductions: obj.deductions?.map(d => ({
+          name: d.name,
+          type: d.type,
+          value: d.value
+        })) || [],
+        preparedBy: obj.preparedBy,
+        createdDate: obj.createdDate,
+        status: obj.status,
+        systemVersion: obj.systemVersion || '3.0'
+      }
+    }
+  }
+
+  const serializableData = safeSerialize(payslipData)
 
   try {
     const response = await axios.post(`${API_BASE_URL}/payslips`, serializableData)
