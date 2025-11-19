@@ -19,10 +19,6 @@
       "dest": "/api/server.js"
     },
     {
-      "src": "/frontend/assets/(.*)",
-      "dest": "/frontend/assets/$1"
-    },
-    {
       "src": "/(.*)\\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|eot|ttf|ico)$",
       "dest": "/frontend/$1.$2"
     },
@@ -31,7 +27,11 @@
       "dest": "/frontend/index.html"
     }
   ],
-
+  "functions": {
+    "api/server.js": {
+      "runtime": "@vercel/node"
+    }
+  },
   "env": {
     "NODE_ENV": "production"
   }
