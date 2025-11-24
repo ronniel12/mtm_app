@@ -1,23 +1,60 @@
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium');
+const puppeteer = require('puppeteer');
 const { put } = require('@vercel/blob');
 const PayslipRenderer = require('./payslip-renderer');
 const BillingRenderer = require('./billing-renderer');
 require('dotenv').config();
 
+// Function to detect if running in Vercel serverless environment
+const isVercelServerless = () => {
+  return process.env.VERCEL || process.env.LAMBDA_TASK_ROOT || process.env.AWS_EXECUTION_ENV;
+};
+
 class PDFService {
+  static async getBrowserConfig() {
+    // Environment detection
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isVercel = isVercelServerless();
+
+    if (isVercel) {
+      console.log('🌐 Running in Vercel serverless environment');
+      return {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-sm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process', // Important for serverless
+          '--disable-gpu'
+        ]
+      };
+    } else {
+      console.log('💻 Running locally');
+      return {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-sm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ]
+      };
+    }
+  }
+
   static async generatePayslipPDF(payslipData) {
     let browser = null;
     try {
       console.log('📄 Starting PDF generation for payslip:', payslipData.payslipNumber);
 
-      // Launch puppeteer browser with Chromium
-      browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
-      });
+      // Get browser configuration based on environment
+      const browserConfig = await this.getBrowserConfig();
+      browser = await puppeteer.launch(browserConfig);
 
       const page = await browser.newPage();
 
@@ -117,13 +154,9 @@ class PDFService {
     try {
       console.log('📄 Starting PDF generation for billing:', billingData.billingNumber);
 
-      // Launch puppeteer browser with Chromium
-      browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
-      });
+      // Get browser configuration based on environment
+      const browserConfig = await this.getBrowserConfig();
+      browser = await puppeteer.launch(browserConfig);
 
       const page = await browser.newPage();
 
