@@ -546,7 +546,24 @@ const deleteBilling = async (billing) => {
 }
 
 const exportBilling = (billing) => {
-  // Create print-friendly version similar to printStatement function
+  // Calculate submitted date based on billing period
+  const calculateSubmittedDate = (startDate) => {
+    const periodStart = new Date(startDate)
+    const startDay = periodStart.getDate()
+
+    let submittedDate
+    if (startDay >= 1 && startDay <= 15) {
+      submittedDate = new Date(periodStart.getFullYear(), periodStart.getMonth(), 18)
+    } else {
+      submittedDate = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 2)
+    }
+
+    return formatDate(submittedDate)
+  }
+
+  const submittedDate = calculateSubmittedDate(billing.period.startDate)
+
+  // Create print-friendly version
   const billToInfo = `Premium Feeds Corp.
 798 Maharlika Highway, Dampol 2nd A
 Pulilan Bulacan, 3005
@@ -597,30 +614,14 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`.replace(/\n/g, '<br>')
 </tbody>
 </table>`
 
-  const printContent = `
-<!DOCTYPE html>
-<html>
-<head>
-<title>Print Preview</title>
-<style>
-@media print {
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; color: #000; padding: 0; }
-  .no-print { display: none; }
-  .company-name-print { font-size: 22px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-bottom: 8px; }
-  .company-details-print { font-size: 11px; text-align: center; line-height: 1.2; margin-bottom: 10px; }
-  .billing-title-print { font-size: 16px; font-weight: bold; text-align: center; margin: 8px 0 12px 0; }
-  .bill-to-print { margin-bottom: 8px; }
-  .bill-to-title-print { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
-  .bill-to-details-print { font-size: 10px; line-height: 1.2; margin-bottom: 6px; }
-  .billing-info-print { font-size: 10px; margin-bottom: 8px; text-align: left; line-height: 1.3; }
-  .prepared-by-print { margin-top: 8px; font-size: 12px; font-weight: bold; }
-  @page { size: A4; margin: 15mm; }
-}
-</style>
-</head>
-<body>
-<div style="border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 12px; text-align: center;">
+
+
+
+const generateBillingPage = (copyType) => `
+<div class="page-container" style="page-break-after: always;">
+<div style="border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 12px; text-align: center; position: relative;">
+<h3 style="position: absolute; top: -5px; left: 20px; font-size: 14px; font-weight: bold; background: white; padding: 0 10px; color: #666;">${copyType}</h3>
+<img src="/mtmlogo.jpeg" alt="MTM Enterprise Logo" class="company-logo-print" />
 <h1 class="company-name-print">MTM ENTERPRISE</h1>
 <div class="company-details-print">
 ${companyInfo}
@@ -638,7 +639,8 @@ ${billToInfo}
 <div class="billing-info-print">
 <strong>Billing Number:</strong> ${billing.billingNumber}<br>
 <strong>Period Covered:</strong> ${billing.period.periodText}<br>
-<strong>Date Generated:</strong> ${formatDate(billing.createdDate)}
+<strong>Date Generated:</strong> ${formatDate(billing.createdDate)}<br>
+<strong>Date Submitted:</strong> ${submittedDate}
 </div>
 
 ${tableHTML}
@@ -646,6 +648,42 @@ ${tableHTML}
 <div class="prepared-by-print">
 <strong>Prepared by:</strong> ${billing.preparedBy}
 </div>
+
+<div class="received-by-print" style="margin-top: 15px;">
+<strong>Received by:</strong> _____
+</div>
+</div>`
+
+const printContent = `<!DOCTYPE html>
+<html>
+<head>
+<title>Billing Statement - MTM & Premium Copies</title>
+<style>
+@media print {
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; color: #000; padding: 0; background: white; }
+  .no-print { display: none; }
+  .company-logo-print { width: 80px; height: auto; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+  .company-name-print { font-size: 22px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-bottom: 8px; }
+  .company-details-print { font-size: 11px; text-align: center; line-height: 1.2; margin-bottom: 10px; }
+  .billing-title-print { font-size: 16px; font-weight: bold; text-align: center; margin: 8px 0 12px 0; }
+  .bill-to-print { margin-bottom: 8px; }
+  .bill-to-title-print { font-weight: bold; font-size: 12px; margin-bottom: 2px; }
+  .bill-to-details-print { font-size: 10px; line-height: 1.2; margin-bottom: 6px; }
+  .billing-info-print { font-size: 10px; margin-bottom: 8px; text-align: left; line-height: 1.3; }
+  .prepared-by-print { margin-top: 8px; font-size: 12px; font-weight: bold; }
+  .received-by-print { margin-top: 8px; font-size: 12px; font-weight: bold; }
+  .page-container { margin: 15mm; margin-bottom: 20mm; }
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+}
+</style>
+</head>
+<body>
+${generateBillingPage('MTM COPY')}
+${generateBillingPage('PREMIUM COPY')}
 </body>
 </html>`
 
