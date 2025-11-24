@@ -177,12 +177,8 @@ router.beforeEach(async (to, from, next) => {
     }
   } else {
     // Route doesn't require authentication
-    if (to.name === 'Login' && isAuthenticated.value) {
-      // If going to login page but already authenticated, redirect to employee portal
-      next('/employee/auto')
-    } else {
-      next()
-    }
+    // Allow access to login page even if authenticated - users can manually access it
+    next()
   }
 })
 
