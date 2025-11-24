@@ -43,6 +43,7 @@ async function createTables() {
         loans DECIMAL(10,2) DEFAULT 0,
         auto_deduct_cash_advance BOOLEAN DEFAULT true,
         auto_deduct_loans BOOLEAN DEFAULT true,
+        access_pin VARCHAR(4) UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )

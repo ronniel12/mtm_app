@@ -452,6 +452,20 @@ const closeEditModal = () => {
 
 const printPayslip = (payslip) => {
   if (confirm('Do you want to print this payslip?')) {
+    // Check if PDF blob URL is available
+    const payslipDetails = getSafeDetails(payslip)
+    console.log('Checking for blob URL:', payslipDetails?.blobUrl)
+
+    if (payslipDetails?.blobUrl) {
+      // Use the pre-generated PDF blob URL
+      console.log('Using pre-generated PDF:', payslipDetails.blobUrl)
+      window.open(payslipDetails.blobUrl, '_blank')
+      return
+    }
+
+    // Fallback to HTML generation if no PDF blob URL
+    console.log('No PDF blob URL found, generating HTML for print')
+
     // Create a new window for printing
     const printWindow = window.open('', '_blank')
     if (!printWindow) {
@@ -547,11 +561,11 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`
 @media print {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Courier New', monospace; color: #000; padding: 6mm 5mm; font-size: 9px; line-height: 1.2; }
-  .company-name-print { font-size: 14px; font-weight: bold; text-align: center; letter-spacing: 1px; margin-bottom: 5px; }
-  .company-details-print { font-size: 8px; text-align: center; line-height: 1.1; margin-bottom: 8px; }
+  .company-name-print { font-size: 14px; font-weight: bold; margin: 3px 0; letter-spacing: 1px; }
+  .company-details-print { font-size: 8px; line-height: 1.1; margin-bottom: 5px; }
   .company-details-print p { margin: 1px 0; }
   .employee-info-print { margin-bottom: 6px; font-size: 8px; }
-  @page { size: A4; margin: 8mm; orientation: portrait; }
+  @page { size: A4; margin: 8mm; }
 }
 </style>
 </head>

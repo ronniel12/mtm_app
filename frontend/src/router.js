@@ -9,6 +9,9 @@ import TollView from './components/TollView.vue'
 import ExpensesView from './components/ExpensesView.vue'
 import Maintenance from './components/Maintenance.vue'
 import Settings from './components/Settings.vue'
+import EmployeePortal from './views/EmployeePortal.vue'
+import LoginPortal from './views/LoginPortal.vue'
+import { useAuth } from '@/composables/useAuth'
 
 const routes = [
   {
@@ -20,6 +23,26 @@ const routes = [
     path: '/dashboard',
     name: 'Dashboard',
     component: DashboardCharts,
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: LoginPortal,
+    meta: { 
+      requiresAuth: false,
+      title: 'Employee Login Portal'
+    }
+  },
+  {
+    path: '/employee/:pin',
+    name: 'EmployeePortal',
+    component: EmployeePortal,
+    props: true,
+    meta: { 
+      requiresAuth: true,
+      title: 'Employee Portal',
+      allowDirectAccess: true // Allow direct URL access for backward compatibility
+    }
   },
   {
     path: '/payroll',
@@ -100,6 +123,73 @@ const routes = [
 const router = createRouter({
   history: createWebHashHistory(),
   routes,
+})
+
+// Authentication guards
+router.beforeEach(async (to, from, next) => {
+  const { initializeAuth, isAuthenticated } = useAuth()
+  
+  // Initialize authentication state
+  const authInitialized = initializeAuth()
+  
+  // Set page title
+  if (to.meta.title) {
+    document.title = `${to.meta.title} | MTM Enterprise`
+  }
+  
+  // Check if route requires authentication
+  if (to.meta.requiresAuth) {
+    // For employee portal, allow direct access but redirect if not authenticated
+    if (to.name === 'EmployeePortal') {
+      const auth = useAuth()
+      
+      if (auth.isAuthenticated.value) {
+        // User is authenticated, allow access
+        next()
+      } else if (to.meta.allowDirectAccess) {
+        // Allow direct access for backward compatibility
+        // Check if PIN matches current user session
+        const routePin = to.params.pin
+        
+        if (routePin && /^\d{4}$/.test(routePin)) {
+          // Allow direct access to employee portal with valid PIN
+          // The component itself will handle the authentication
+          next()
+        } else {
+          // Invalid PIN format, redirect to login
+          next('/login')
+        }
+      } else {
+        // Not authenticated and no direct access allowed, redirect to login
+        next('/login')
+      }
+    } else {
+      // Other protected routes
+      if (isAuthenticated.value) {
+        next()
+      } else {
+        // Redirect to login with return URL
+        next({
+          path: '/login',
+          query: { redirect: to.fullPath }
+        })
+      }
+    }
+  } else {
+    // Route doesn't require authentication
+    if (to.name === 'Login' && isAuthenticated.value) {
+      // If going to login page but already authenticated, redirect to employee portal
+      next('/employee/auto')
+    } else {
+      next()
+    }
+  }
+})
+
+// Global after hook for navigation tracking
+router.afterEach((to, from) => {
+  // Track navigation for analytics or debugging if needed
+  console.log(`Navigation: ${from.path} -> ${to.path}`)
 })
 
 export default router
