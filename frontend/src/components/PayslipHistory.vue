@@ -467,7 +467,7 @@ const printPayslip = (payslip) => {
     console.log('No PDF blob URL found, generating HTML for print')
 
     // Import payslip renderer for consistent fallback
-    import('../../../api/payslip-renderer').then(renderer => {
+    import('../composables/usePayslipRenderer.js').then(renderer => {
       const htmlContent = renderer.default.generatePayslipHTML(payslip, true)
 
       // Create new window with consistent content
