@@ -1982,9 +1982,34 @@ app.post('/api/billings', jsonParser, async (req, res) => {
         String(localNow.getMilliseconds()).padStart(3, '0') + '+02';
     }
 
+    // Generate PDF synchronously (works in serverless)
+    let pdfResult = null;
+    try {
+      console.log('📄 Generating PDF synchronously for billing:', body.billingNumber);
+      pdfResult = await PDFService.generateAndUploadBillingPDF(body);
+      console.log('✅ PDF generated:', pdfResult.pdfGenerated ? pdfResult.blobUrl : 'Failed');
+    } catch (pdfError) {
+      console.error('❌ PDF generation failed during billing creation:', pdfError.message);
+      pdfResult = { pdfGenerated: false, error: pdfError.message };
+    }
+
+    // Build details with PDF result
+    const billingDetails = {
+      ...body,
+      ...(pdfResult && pdfResult.pdfGenerated ? {
+        blobUrl: pdfResult.blobUrl,
+        pdfGenerated: true,
+        pdfFilename: pdfResult.filename,
+        pdfSize: pdfResult.size
+      } : {
+        pdfGenerated: false,
+        pdfError: pdfResult?.error || 'Unknown PDF error'
+      })
+    };
+
     const result = await query(`
-      INSERT INTO billings (id, billing_number, period_start, period_end, client_name, client_address, client_city, client_zip_code, client_tin, trips, totals, prepared_by, payment_status, created_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      INSERT INTO billings (id, billing_number, period_start, period_end, client_name, client_address, client_city, client_zip_code, client_tin, trips, totals, prepared_by, payment_status, created_date, details)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `, [
       body.id || Date.now().toString(),
@@ -2000,7 +2025,8 @@ app.post('/api/billings', jsonParser, async (req, res) => {
       JSON.stringify(body.totals || {}),
       body.preparedBy,
       body.paymentStatus || 'pending',
-      finalTimestamp
+      finalTimestamp,
+      JSON.stringify(billingDetails)
     ]);
 
     console.log('Created new billing:', body.billingNumber);
@@ -2078,6 +2104,36 @@ app.delete('/api/billings/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting billing:', error);
     res.status(500).json({ error: 'Failed to delete billing' });
+  }
+});
+
+// PDF download endpoint for billings - Note: Billings don't permanently store PDF URLs
+app.get('/api/billings/:id/download', async (req, res) => {
+  try {
+    const result = await query('SELECT billing_number FROM billings WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Billing not found' });
+    }
+
+    const billing = result.rows[0];
+    let details;
+    try {
+      // JSONB is already parsed by pg, so use directly
+      details = billing.details || {};
+    } catch (parseError) {
+      console.warn(`Failed to parse billing details for ${req.params.id}:`, parseError.message);
+      details = {};
+    }
+
+    if (!details.blobUrl) {
+      return res.status(404).json({ message: 'PDF not available for this billing' });
+    }
+
+    // Redirect to the blob URL
+    res.redirect(details.blobUrl);
+  } catch (error) {
+    console.error('Error downloading billing PDF:', error);
+    res.status(500).json({ error: 'Failed to download billing PDF' });
   }
 });
 

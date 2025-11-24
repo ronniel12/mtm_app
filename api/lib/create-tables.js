@@ -81,6 +81,7 @@ async function createTables() {
         prepared_by TEXT,
         payment_status VARCHAR(50) DEFAULT 'pending',
         created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        details JSONB,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -89,7 +90,8 @@ async function createTables() {
     try {
       await query(`ALTER TABLE billings ADD COLUMN IF NOT EXISTS client_city TEXT`);
       await query(`ALTER TABLE billings ADD COLUMN IF NOT EXISTS client_zip_code VARCHAR(10)`);
-      console.log('✅ Added missing client_city and client_zip_code columns to billings table');
+      await query(`ALTER TABLE billings ADD COLUMN IF NOT EXISTS details JSONB`);
+      console.log('✅ Added missing client_city, client_zip_code, and details columns to billings table');
     } catch (error) {
       console.log('ℹ️ Columns may already exist or error adding them:', error.message);
     }
