@@ -466,137 +466,30 @@ const printPayslip = (payslip) => {
     // Fallback to HTML generation if no PDF blob URL
     console.log('No PDF blob URL found, generating HTML for print')
 
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) {
-      alert('Please allow popups for printing to work.')
-      return
-    }
+    // Import payslip renderer for consistent fallback
+    import('../../../api/payslip-renderer').then(renderer => {
+      const htmlContent = renderer.default.generatePayslipHTML(payslip, true)
 
-    const companyInfo = `MTM ENTERPRISE<br>
-0324 P. Damaso St. Virgen Delas Flores Baliuag Bulacan<br>
-TIN # 175-434-337-000<br>
-Mobile No. 09605638462 / Telegram No. +358-044-978-8592`
+      // Create new window with consistent content
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        alert('Please allow popups for printing to work.')
+        return
+      }
 
-    let tableHTML = `
-<table style="width: 100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; margin-top: 20px;">
-<thead>
-<tr style="background: #f0f0f0;">
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">DATE</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">TRUCK PLATE</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">INVOICE NUMBER</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">DESTINATION</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">BAGS</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">RATE/BAG</th>
-<th style="border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold;">TOTAL</th>
-</tr>
-</thead>
-<tbody>`
+      printWindow.document.write(htmlContent)
+      printWindow.document.close()
+      printWindow.document.title = `${payslip.displayNumber}_${payslip.displayEmployeeName.replace(/\s+/g, '_')}.pdf`
 
-    payslip.trips.forEach((trip) => {
-      tableHTML += `
-<tr style="background: white;">
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${formatDate(trip.date)}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.truckPlate}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.invoiceNumber}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.destination}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.numberOfBags}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip.adjustedRate ? formatCurrency(trip.adjustedRate) : '0.00'}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip.total ? formatCurrency(trip.total) : '0.00'}</td>
-</tr>`
+      printWindow.onload = () => {
+        printWindow.focus()
+        printWindow.print()
+      }
+    }).catch(error => {
+      console.error('Failed to import renderer for fallback print:', error)
+      // Fallback to simple alert if renderer import fails
+      alert('Print functionality is temporarily unavailable. PDF download should work.')
     })
-
-    tableHTML += `
-<tr style="background: #e0e0e0; font-weight: bold;">
-<td colspan="4" style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">GROSS PAY:</td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 14px;">${payslip.displayTotalBags}</td>
-<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
-<td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 14px;">₱${formatCurrency(payslip.displayGrossPay)}</td>
-</tr>`
-
-    // Add deductions if any
-    if (payslip.deductions && payslip.deductions.length > 0) {
-      payslip.deductions.forEach(deduction => {
-        const deductionAmount = deduction.type === 'percentage'
-          ? (payslip.displayGrossPay * (deduction.value / 100))
-          : deduction.value
-        tableHTML += `
-<tr style="background: #fffefa; font-size: 9px;">
-<td colspan="6" style="border: 1px solid #000; padding: 4px 8px; text-align: left; color: #666;">${deduction.name} (${deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value)}):</td>
-<td style="border: 1px solid #000; padding: 4px; text-align: right; color: #dc3545;">-₱${formatCurrency(deductionAmount)}</td>
-</tr>`
-      })
-
-      tableHTML += `
-<tr style="background: #fff3cd; font-weight: bold;">
-<td colspan="6" style="border: 1px solid #000; padding: 6px 8px; text-align: left; font-size: 11px; color: #856404;">TOTAL DEDUCTIONS:</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right; color: #dc3545;">-₱${formatCurrency(payslip.displayTotalDeductions)}</td>
-</tr>
-<tr style="background: #d1ecf1; font-weight: bold; border: 2px solid #28a745;">
-<td colspan="6" style="border: 2px solid #28a745; padding: 8px; text-align: left; font-size: 12px; color: #0c5460;">NET PAY:</td>
-<td style="border: 2px solid #28a745; padding: 8px; text-align: right; font-size: 14px; color: #28a745;">₱${formatCurrency(payslip.displayNetPay)}</td>
-</tr>`
-    }
-
-    tableHTML += `
-<tr style="background: white; font-weight: normal;">
-<td colspan="7" style="border: 1px solid #000; padding: 15px 10px; text-align: left; font-size: 11px;"><strong>Prepared by:</strong> ${payslip.displayPreparedBy || '_______________________________'}</td>
-</tr>
-</tbody>
-</table>`
-
-    const employeeInfo = `<strong>Employee Name:</strong> ${payslip.displayEmployeeName}<br>
-<strong>Payslip Number:</strong> ${payslip.displayNumber}<br>
-<strong>Period Covered:</strong> ${payslip.displayPeriod}<br>
-<strong>Date Generated:</strong> ${formatDate(payslip.displayCreatedDate)}`
-
-    const filename = `${payslip.displayNumber}_${payslip.displayEmployeeName.replace(/\s+/g, '_')}.pdf`
-
-    const printContent = `
-<!DOCTYPE html>
-<html>
-<head>
-<title>Print - ${payslip.displayNumber}</title>
-<style>
-@media print {
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; color: #000; padding: 6mm 5mm; font-size: 9px; line-height: 1.2; }
-  .company-name-print { font-size: 14px; font-weight: bold; margin: 3px 0; letter-spacing: 1px; }
-  .company-details-print { font-size: 8px; line-height: 1.1; margin-bottom: 5px; }
-  .company-details-print p { margin: 1px 0; }
-  .employee-info-print { margin-bottom: 6px; font-size: 8px; }
-  @page { size: A4; margin: 8mm; }
-}
-</style>
-</head>
-<body style="font-family: Arial, sans-serif; color: #000; background: white; margin: 0; padding: 20px;">
-<div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; text-align: center;">
-<h1 class="company-name-print">MTM ENTERPRISE</h1>
-<div class="company-details-print">
-${companyInfo}
-</div>
-<h2 style="font-size: 18px; font-weight: bold; margin: 15px 0;">PAYSLIP</h2>
-</div>
-
-<div class="employee-info-print" style="margin-top: 15px; line-height: 1.6;">
-${employeeInfo}
-</div>
-
-${tableHTML}
-</body>
-</html>`
-
-    printWindow.document.write(printContent)
-    printWindow.document.close()
-
-    // Set filename for download
-    printWindow.document.title = filename
-
-    // Wait for content to load, then print
-    printWindow.onload = () => {
-      printWindow.focus()
-      printWindow.print()
-    }
   }
 }
 

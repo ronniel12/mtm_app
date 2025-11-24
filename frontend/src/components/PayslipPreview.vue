@@ -50,7 +50,10 @@
             <th class="invoice-col">INVOICE NUMBER</th>
             <th class="destination-col">DESTINATION</th>
             <th class="bags-col">BAGS</th>
-            <th class="rate-col">RATE/BAG</th>
+            <th class="position-col">POS</th>
+            <th class="rate-col">RATE</th>
+            <th class="trip-value-col">TRIP VALUE</th>
+            <th class="commission-col">COMM %</th>
             <th class="total-col">TOTAL</th>
           </tr>
         </thead>
@@ -62,64 +65,72 @@
             <td class="invoice-cell">{{ trip.invoiceNumber }}</td>
             <td class="destination-cell">{{ trip.destination || trip.fullDestination }}</td>
             <td class="bags-cell text-center">{{ trip.numberOfBags || trip.number_of_bags }}</td>
+            <td class="position-cell text-center">{{ trip._role === 'D' ? 'Driver' : trip._role === 'H' ? 'Helper' : 'UNK' }}</td>
             <td class="rate-cell text-right">{{ trip.adjustedRate ? formatCurrency(trip.adjustedRate) : '0.00' }}</td>
+            <td class="trip-value-cell text-right">{{ (trip.adjustedRate || 0) && (trip.numberOfBags || trip.number_of_bags || 0) ? formatCurrency((trip.adjustedRate) * (trip.numberOfBags || trip.number_of_bags)) : '0.00' }}</td>
+            <td class="commission-cell text-center">{{ trip._commission ? (trip._commission * 100).toFixed(0) + '%' : '--%' }}</td>
             <td class="total-cell text-right">{{ trip.total ? formatCurrency(trip.total) : '0.00' }}</td>
           </tr>
 
-          <!-- Spacer row -->
-          <tr class="spacer-row">
-            <td colspan="7"></td>
+          <!-- Separator row -->
+          <tr class="separator-row">
+            <td colspan="10" class="separator-cell"></td>
           </tr>
 
-          <!-- Totals section -->
+          <!-- Gross Pay row - aligned with same 10-column structure -->
           <tr class="totals-row">
-            <td class="text-left fw-bold totals-label">GROSS PAY:</td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td class="text-center fw-bold totals-bags">{{ (payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.totalBags || 0 }}</td>
-            <td></td>
-            <td class="text-right fw-bold totals-amount">₱{{ formatCurrency((payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.totalPay || 0) }}</td>
+            <td class="date-cell text-left fw-bold">GROSS PAY:</td>
+            <td class="plate-cell"></td>
+            <td class="invoice-cell"></td>
+            <td class="destination-cell"></td>
+            <td class="bags-cell text-center fw-bold">{{ (payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.totalBags || 0 }}</td>
+            <td class="position-cell"></td>
+            <td class="rate-cell"></td>
+            <td class="trip-value-cell"></td>
+            <td class="commission-cell"></td>
+            <td class="total-cell text-right fw-bold">₱{{ formatCurrency((payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.totalPay || 0) }}</td>
           </tr>
 
-          <!-- Individual Deductions rows - show each deduction itemized -->
-          <tr v-for="(deduction, index) in ((payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).deductions : null) || payslip.deductions || [])" :key="deduction.name + index" class="individual-deduction-row">
-            <td class="text-left fw-bold individual-deduction-label">
-              {{ deduction.name }}
-              <span class="deduction-type-indicator">
-                ({{ deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value) }})
-              </span>
-            </td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td class="text-right fw-bold individual-deduction-amount">
-              -₱{{ formatCurrency(deduction.calculatedAmount || (deduction.type === 'percentage' ? (((payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.totalPay || 0) * deduction.value / 100) : deduction.value)) }}
-            </td>
+          <!-- Individual Deductions rows - aligned with same 10-column structure -->
+          <tr v-for="(deduction, index) in ((payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).deductions : null) || payslip.deductions || [])" :key="deduction.name + index" class="deduction-row">
+            <td class="date-cell text-left fw-bold">{{ deduction.name }} ({{ deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value) }}):</td>
+            <td class="plate-cell"></td>
+            <td class="invoice-cell"></td>
+            <td class="destination-cell"></td>
+            <td class="bags-cell"></td>
+            <td class="position-cell"></td>
+            <td class="rate-cell"></td>
+            <td class="trip-value-cell"></td>
+            <td class="commission-cell"></td>
+            <td class="total-cell text-right fw-bold">-₱{{ formatCurrency(deduction.calculatedAmount || (deduction.type === 'percentage' ? (((payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.totalPay || 0) * deduction.value / 100) : deduction.value)) }}</td>
           </tr>
 
-          <!-- Total Deductions summary row - only show if deductions exist -->
+          <!-- Total Deductions row - only show if deductions exist -->
           <tr v-if="((payslip.deductions || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).deductions : []) || []).length > 0)" class="total-deductions-row">
-            <td class="text-left fw-bold total-deductions-label">TOTAL DEDUCTIONS:</td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td class="text-right fw-bold total-deductions-amount">-₱{{ formatCurrency((payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.totalDeductions || 0) }}</td>
+            <td class="date-cell text-left fw-bold">TOTAL DEDUCTIONS:</td>
+            <td class="plate-cell"></td>
+            <td class="invoice-cell"></td>
+            <td class="destination-cell"></td>
+            <td class="bags-cell"></td>
+            <td class="position-cell"></td>
+            <td class="rate-cell"></td>
+            <td class="trip-value-cell"></td>
+            <td class="commission-cell"></td>
+            <td class="total-cell text-right fw-bold">-₱{{ formatCurrency((payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.totalDeductions || 0) }}</td>
           </tr>
 
           <!-- Net Pay row - only show if deductions exist -->
           <tr v-if="((payslip.deductions || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).deductions : []) || []).length > 0)" class="net-pay-row">
-            <td class="text-left fw-bold net-pay-label">NET PAY:</td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td class="text-right fw-bold net-pay-amount">₱{{ formatCurrency((payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.netPay || 0) }}</td>
+            <td class="date-cell text-left fw-bold">NET PAY:</td>
+            <td class="plate-cell"></td>
+            <td class="invoice-cell"></td>
+            <td class="destination-cell"></td>
+            <td class="bags-cell"></td>
+            <td class="position-cell"></td>
+            <td class="rate-cell"></td>
+            <td class="trip-value-cell"></td>
+            <td class="commission-cell"></td>
+            <td class="total-cell text-right fw-bold">₱{{ formatCurrency((payslip.totals || (payslip.details ? (typeof payslip.details === 'string' ? JSON.parse(payslip.details) : payslip.details).totals : null))?.netPay || 0) }}</td>
           </tr>
         </tbody>
       </table>
@@ -137,6 +148,7 @@
 
 <script setup>
 import { defineProps } from 'vue'
+import { usePayslipStyling } from '@/composables/usePayslipStyling'
 
 const props = defineProps({
   payslip: {
@@ -144,6 +156,9 @@ const props = defineProps({
     required: true
   }
 })
+
+// Use shared payslip styling
+const { payslipVars, payslipStyles } = usePayslipStyling()
 
 const formatDate = (dateString) => {
   if (!dateString) return ''
@@ -163,13 +178,13 @@ const formatCurrency = (amount) => {
 </script>
 
 <style scoped>
+/* Use shared payslip styles */
 .payslip-preview {
-  font-family: 'Courier New', monospace;
-  max-width: none;
+  background: var(--payslip-bg);
+  font-family: var(--payslip-font);
+  color: var(--payslip-text);
   margin: 0;
   padding: 0;
-  background: white;
-  color: #000;
 }
 
 /* Centered Company Header */
@@ -327,154 +342,18 @@ const formatCurrency = (amount) => {
 .rate-col { width: 12%; }
 .total-col { width: 13%; }
 
-/* Totals Row */
-.totals-row {
-  background: #e0e0e0;
-  font-size: 0.7rem;
-  font-weight: bold;
-  border: 2px solid #000;
+.separator-row {
+  border-top: 2px solid #000;
+  border-bottom: 2px solid #000;
 }
 
-.totals-row td {
-  padding: 0.5rem 0.15rem;
-  border: none;
-}
-
-.totals-label {
-  font-size: 0.75rem;
+.separator-cell {
+  height: 8px;
+  background: #000;
 }
 
 .totals-bags {
   text-align: center;
-}
-
-.totals-amount {
-  font-size: 0.9rem;
-  color: #000;
-}
-
-/* Deductions Row */
-.deductions-row {
-  background: #fff3cd;
-  font-size: 0.7rem;
-  font-weight: bold;
-  border: 1px solid #000;
-}
-
-.deductions-row td {
-  padding: 0.4rem 0.15rem;
-  border: none;
-}
-
-.deductions-label {
-  font-size: 0.75rem;
-  color: #000;
-}
-
-.deductions-amount {
-  font-size: 0.85rem;
-  color: #000;
-}
-
-/* Individual Deductions rows - show each deduction itemized */
-.individual-deduction-row {
-  background: #fefefa;
-  font-size: 0.65rem; /* Match table font size */
-  font-weight: normal;
-  border: 1px solid #000;
-}
-
-.individual-deduction-row td {
-  padding: 0.3rem 0.15rem;
-  border: none;
-}
-
-.individual-deduction-label {
-  font-size: 0.65rem; /* Match table font size */
-  color: #000;
-}
-
-.individual-deduction-amount {
-  font-size: 0.65rem; /* Match table font size */
-  color: #000;
-}
-
-.deduction-type-indicator {
-  font-size: 0.6rem;
-  color: #6c757d;
-  font-weight: normal;
-  margin-left: 0.3rem;
-}
-
-/* Total Deductions Row */
-.total-deductions-row {
-  background: #fff3cd;
-  font-size: 0.7rem;
-  font-weight: bold;
-  border: 1px solid #000;
-}
-
-.total-deductions-row td {
-  padding: 0.4rem 0.15rem;
-  border: none;
-}
-
-.total-deductions-label {
-  font-size: 0.75rem;
-  color: #000;
-}
-
-.total-deductions-amount {
-  font-size: 0.9rem;
-  color: #000;
-}
-
-/* Net Pay Row */
-.net-pay-row {
-  background: #d1ecf1;
-  font-size: 0.7rem;
-  font-weight: bold;
-  border: 2px solid #28a745;
-}
-
-.net-pay-row td {
-  padding: 0.5rem 0.15rem;
-  border: none;
-}
-
-.net-pay-label {
-  font-size: 0.75rem;
-  color: #000;
-}
-
-.net-pay-amount {
-  font-size: 1rem;
-  color: #000;
-}
-
-/* Prepared by Section */
-.prepared-by-section {
-  display: flex;
-  justify-content: flex-start;
-  margin-bottom: 0.5rem;
-  font-size: 0.75rem;
-  page-break-inside: avoid;
-}
-
-.prepared-by-info {
-  font-weight: bold;
-}
-
-.text-center {
-  text-align: center;
-}
-
-.text-right {
-  text-align: right;
-}
-
-.fw-bold {
-  font-weight: bold;
 }
 
 /* Print Styles */
@@ -586,15 +465,33 @@ const formatCurrency = (amount) => {
   }
 
   .payroll-table .header-row th:nth-child(6),
-  .payroll-table .data-row td:nth-child(6) { /* Rate */
+  .payroll-table .data-row td:nth-child(6) { /* POS */
+    width: auto;
+    min-width: 70px;
+  }
+
+  .payroll-table .header-row th:nth-child(7),
+  .payroll-table .data-row td:nth-child(7) { /* Rate (-₱4) */
+    width: auto;
+    min-width: 90px;
+  }
+
+  .payroll-table .header-row th:nth-child(8),
+  .payroll-table .data-row td:nth-child(8) { /* Trip Value */
     width: auto;
     min-width: 100px;
   }
 
-  .payroll-table .header-row th:nth-child(7),
-  .payroll-table .data-row td:nth-child(7) { /* Total */
+  .payroll-table .header-row th:nth-child(9),
+  .payroll-table .data-row td:nth-child(9) { /* Comm % */
     width: auto;
-    min-width: 110px;
+    min-width: 70px;
+  }
+
+  .payroll-table .header-row th:nth-child(10),
+  .payroll-table .data-row td:nth-child(10) { /* Total */
+    width: auto;
+    min-width: 90px;
   }
 }
 </style>

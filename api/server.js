@@ -1782,6 +1782,93 @@ app.delete('/api/payslips/:id', async (req, res) => {
   }
 });
 
+// Generate PDF for employee payslips on-demand
+app.post('/api/payslips/generate-pdf', jsonParser, async (req, res) => {
+  try {
+    const payslipData = req.body;
+
+    console.log('📥 Received payslip data for PDF generation:', {
+      hasData: !!payslipData,
+      payslipNumber: payslipData?.payslipNumber,
+      keys: payslipData ? Object.keys(payslipData) : [],
+      sampleFields: payslipData ? {
+        employeeName: payslipData.employeeName,
+        period: payslipData.period,
+        grossPay: payslipData.grossPay
+      } : null
+    });
+
+    if (!payslipData || !payslipData.payslipNumber) {
+      console.log('❌ Validation failed - missing payslipData or payslipNumber');
+      return res.status(400).json({
+        error: 'Invalid payslip data provided',
+        received: {
+          hasData: !!payslipData,
+          payslipNumber: payslipData?.payslipNumber
+        }
+      });
+    }
+
+    console.log('🔧 Generating PDF for employee payslip:', payslipData.payslipNumber);
+
+    // Transform employee payslip data to match PDF service format
+    // This matches the structure expected by PDFService.generatePayslipHTML
+    const transformedData = {
+      payslipNumber: payslipData.payslipNumber,
+      employee: {
+        name: payslipData.employeeName || 'Employee'
+      },
+      period: {
+        periodText: payslipData.period
+      },
+      totals: {
+        grossPay: payslipData.grossPay || 0,
+        totalDeductions: payslipData.totalDeductions || 0,
+        netPay: payslipData.netPay || 0,
+        totalBags: payslipData.trips?.reduce((sum, trip) => sum + (trip.numberOfBags || trip.number_of_bags || 0), 0) || 0
+      },
+      deductions: payslipData.deductions || [],
+      trips: payslipData.trips?.map(trip => {
+        // Ensure we have the role information needed for PDF
+        const role = trip._role || 'D'; // Default to Driver if not specified
+        const commission = trip._commission || (role === 'D' ? 0.11 : 0.10); // Default commission rates
+
+        return {
+          date: trip.date,
+          truckPlate: trip.truckPlate || trip.truck_plate,
+          invoiceNumber: trip.invoiceNumber,
+          destination: trip.destination || trip.fullDestination,
+          numberOfBags: trip.numberOfBags || trip.number_of_bags,
+          // Preserve or reconstruct the detailed information needed for PDF columns
+          _role: role,
+          _commission: commission,
+          adjustedRate: trip.adjustedRate || (trip.rate ? trip.rate - 4 : 0),
+          rate: trip.rate || 0,
+          total: trip.total || 0
+        };
+      }) || [],
+      createdDate: payslipData.createdDate
+    };
+
+    // Generate PDF using the same service as admin payslips
+    const pdfBuffer = await PDFService.generatePDFOnly(transformedData);
+
+    console.log('📄 PDF buffer type:', typeof pdfBuffer, 'size:', pdfBuffer?.length);
+
+    // Return the PDF buffer as response
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${payslipData.payslipNumber}.pdf"`);
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('Error generating employee payslip PDF:', error);
+    res.status(500).json({
+      error: 'PDF generation failed',
+      details: error.message
+    });
+  }
+});
+
 // Billings API endpoints
 app.get('/api/billings', async (req, res) => {
   try {

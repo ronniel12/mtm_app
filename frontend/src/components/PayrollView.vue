@@ -95,6 +95,8 @@
                   <th class="col-bags">BAGS</th>
                   <th class="col-position">POS</th>
                   <th class="col-rate">RATE</th>
+                  <th class="col-trip-value">TRIP VALUE</th>
+                  <th class="col-commission">COMM %</th>
                   <th class="col-total">TOTAL</th>
                 </tr>
               </thead>
@@ -108,63 +110,75 @@
                   <td class="col-bags text-center">{{ trip.numberOfBags }}</td>
                   <td class="col-position text-center">{{ formatEmployeeRole(trip._role) }}</td>
                   <td class="col-rate text-right">{{ trip._rate ? formatCurrency(trip._rate - 4) : '0.00' }}</td>
+                  <td class="col-trip-value text-right">{{ trip._rate && trip.numberOfBags ? formatCurrency((trip._rate - 4) * trip.numberOfBags) : '0.00' }}</td>
+                  <td class="col-commission text-center">{{ trip._commission ? (trip._commission * 100).toFixed(0) + '%' : '--' }}</td>
                   <td class="col-total text-right">{{ trip._rate && trip.numberOfBags ? formatCurrency((trip._rate - 4) * trip.numberOfBags * trip._commission) : '0.00' }}</td>
                 </tr>
 
                 <!-- Spacer row -->
                 <tr class="spacer-row">
-                  <td colspan="8" class="spacer-cell"></td>
+                  <td colspan="10" class="spacer-cell"></td>
                 </tr>
 
-                <!-- Totals section -->
+                <!-- Separator row -->
+                <tr class="separator-row">
+                  <td colspan="10" class="separator-cell"></td>
+                </tr>
+
+                <!-- Gross Pay row - aligned with same 10-column structure -->
                 <tr class="totals-row">
-                  <td colspan="4" class="totals-label-cell">
-                    <span class="totals-label">GROSS PAY:</span>
-                  </td>
-                  <td class="totals-bags-cell text-center">
-                    <span class="totals-bags">{{ totalBags }}</span>
-                  </td>
-                  <td colspan="2" class="empty-cell"></td>
-                  <td class="totals-amount-cell text-right">
-                    <span class="totals-amount">₱{{ formatCurrency(totalPay) }}</span>
-                  </td>
+                  <td class="col-date text-left fw-bold">GROSS PAY:</td>
+                  <td class="col-plate"></td>
+                  <td class="col-invoice"></td>
+                  <td class="col-destination"></td>
+                  <td class="col-bags text-center fw-bold">{{ totalBags }}</td>
+                  <td class="col-position"></td>
+                  <td class="col-rate"></td>
+                  <td class="col-trip-value"></td>
+                  <td class="col-commission"></td>
+                  <td class="col-total text-right fw-bold">₱{{ formatCurrency(totalPay) }}</td>
                 </tr>
 
-                <!-- Individual Deductions rows -->
+                <!-- Individual Deductions rows - aligned with same 10-column structure -->
                 <tr v-for="(deduction, index) in deductions" :key="deduction.name + index" class="deduction-row">
-                  <td colspan="7" class="deduction-label-cell">
-                    <span class="deduction-label">
-                      {{ deduction.name }}
-                      <span class="deduction-indicator">
-                        ({{ deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value) }})
-                      </span>
-                    </span>
-                  </td>
-                  <td class="deduction-amount-cell text-right">
-                    <span class="deduction-amount">
-                      -₱{{ formatCurrency(calculateDeductionAmount(deduction)) }}
-                    </span>
-                  </td>
+                  <td class="col-date text-left fw-bold">{{ deduction.name }} ({{ deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value) }}):</td>
+                  <td class="col-plate"></td>
+                  <td class="col-invoice"></td>
+                  <td class="col-destination"></td>
+                  <td class="col-bags"></td>
+                  <td class="col-position"></td>
+                  <td class="col-rate"></td>
+                  <td class="col-trip-value"></td>
+                  <td class="col-commission"></td>
+                  <td class="col-total text-right fw-bold">-₱{{ formatCurrency(calculateDeductionAmount(deduction)) }}</td>
                 </tr>
 
-                <!-- Total Deductions row -->
+                <!-- Total Deductions row - only show if deductions exist -->
                 <tr v-if="deductions.length > 0" class="total-deductions-row">
-                  <td colspan="7" class="total-deductions-label-cell">
-                    <span class="total-deductions-label">TOTAL DEDUCTIONS:</span>
-                  </td>
-                  <td class="total-deductions-amount-cell text-right">
-                    <span class="total-deductions-amount">-₱{{ formatCurrency(totalDeductions) }}</span>
-                  </td>
+                  <td class="col-date text-left fw-bold">TOTAL DEDUCTIONS:</td>
+                  <td class="col-plate"></td>
+                  <td class="col-invoice"></td>
+                  <td class="col-destination"></td>
+                  <td class="col-bags"></td>
+                  <td class="col-position"></td>
+                  <td class="col-rate"></td>
+                  <td class="col-trip-value"></td>
+                  <td class="col-commission"></td>
+                  <td class="col-total text-right fw-bold">-₱{{ formatCurrency(totalDeductions) }}</td>
                 </tr>
 
-                <!-- Net Pay row -->
+                <!-- Net Pay row - only show if deductions exist -->
                 <tr v-if="deductions.length > 0" class="net-pay-row">
-                  <td colspan="7" class="net-pay-label-cell">
-                    <span class="net-pay-label">NET PAY:</span>
-                  </td>
-                  <td class="net-pay-amount-cell text-right">
-                    <span class="net-pay-amount">₱{{ formatCurrency(netPay) }}</span>
-                  </td>
+                  <td class="col-date text-left fw-bold">NET PAY:</td>
+                  <td class="col-plate"></td>
+                  <td class="col-invoice"></td>
+                  <td class="col-destination"></td>
+                  <td class="col-bags"></td>
+                  <td class="col-position"></td>
+                  <td class="col-rate"></td>
+                  <td class="col-trip-value"></td>
+                  <td class="col-commission"></td>
+                  <td class="col-total text-right fw-bold">₱{{ formatCurrency(netPay) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1087,20 +1101,28 @@ payslip.trips.forEach((trip, index) => {
   })
 
     tableHTML += `
-<tr style="background: #e0e0e0; font-weight: bold;">
-<td colspan="4" style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">GROSS PAY:</td>
+<tr style="border: 2px solid #000; font-weight: bold;">
+<td style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">GROSS PAY:</td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
 <td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 14px;">${totalBags.value}</td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
 <td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
 <td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 14px;">₱${formatCurrency(totalPay.value)}</td>
 </tr>`
 
   // First show NET PAY above the table, then deductions below
   tableHTML += `
-<tr style="background: #d1ecf1; font-weight: bold; border: 2px solid #28a745;">
-<td colspan="4" style="border: 2px solid #28a745; padding: 10px; text-align: left; font-size: 12px; color: #0c5460;">NET PAY:</td>
-<td style="border: 2px solid #28a745; padding: 10px; text-align: center;"></td>
-<td style="border: 2px solid #28a745; padding: 10px; text-align: center;"></td>
-<td style="border: 2px solid #28a745; padding: 10px; text-align: right; font-size: 16px; color: #28a745;">₱${formatCurrency(netPay.value)}</td>
+<tr style="border: 2px solid #000; font-weight: bold;">
+<td style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">NET PAY:</td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 16px;">₱${formatCurrency(netPay.value)}</td>
 </tr>`
 
   const employeeInfo = `<strong>Employee Name:</strong> ${selectedEmployeeName.value}<br>
@@ -1267,42 +1289,64 @@ ${payslip.company.contact}`.replace(/\n/g, '<br>')
   // Add deductions using unified formatting if they exist
   if (payslip.deductions.length > 0) {
     tableHTML += `
-<tr style="background: #e0e0e0; font-weight: bold;">
+<tr style="border: 2px solid #000; font-weight: bold;">
 <td style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 10px;">GROSS PAY:</td>
-<td></td>
-<td></td>
-<td></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
 <td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 10px;">${payslip.totals.totalBags}</td>
-<td></td>
-<td></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
 <td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 10px;">${payslip.totals.grossPay}</td>
 </tr>`
 
     // Individual deductions breakdown using unified data
     payslip.deductions.forEach(deduction => {
       tableHTML += `
-<tr style="background: #fefefa; font-size: 10px;">
-<td colspan="7" style="border: 1px solid #000; padding: 4px 8px; text-align: left; color: #000;">${deduction.name} ${deduction.displayValue}:</td>
-<td style="border: 1px solid #000; padding: 4px; text-align: right; color: #000;">${deduction.amount}</td>
+<tr style="border: 1px solid #000; font-size: 10px;">
+<td style="border: 1px solid #000; padding: 4px 8px; text-align: left;">${deduction.name} ${deduction.displayValue}:</td>
+<td style="border: 1px solid #000; padding: 4px; text-align: center;"></td>
+<td style="border: 1px solid #000; padding: 4px; text-align: center;"></td>
+<td style="border: 1px solid #000; padding: 4px; text-align: center;"></td>
+<td style="border: 1px solid #000; padding: 4px; text-align: center;"></td>
+<td style="border: 1px solid #000; padding: 4px; text-align: center;"></td>
+<td style="border: 1px solid #000; padding: 4px; text-align: center;"></td>
+<td style="border: 1px solid #000; padding: 4px; text-align: right;">${deduction.amount}</td>
 </tr>`
     })
 
     // Total deductions and net pay using unified data
     tableHTML += `
-<tr style="background: #fff3cd; font-weight: bold;">
-<td colspan="7" style="border: 1px solid #000; padding: 6px 8px; text-align: left; font-size: 11px; color: #000;">${payslip.totalsDeductions.label}:</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right; color: #000;">${payslip.totalsDeductions.amount}</td>
+<tr style="border: 2px solid #000; font-weight: bold;">
+<td style="border: 2px solid #000; padding: 6px 8px; text-align: left; font-size: 11px;">${payslip.totalsDeductions.label}:</td>
+<td style="border: 2px solid #000; padding: 6px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 6px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 6px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 6px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 6px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 6px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 6px; text-align: right;">${payslip.totalsDeductions.amount}</td>
 </tr>
-<tr style="background: #d1ecf1; font-weight: bold; border: 2px solid #28a745;">
-<td colspan="7" style="border: 2px solid #28a745; padding: 8px; text-align: left; font-size: 12px; color: #000;">NET PAY:</td>
-<td style="border: 2px solid #28a745; padding: 8px; text-align: right; font-size: 14px; color: #000;">${payslip.totals.netPay}</td>
+<tr style="border: 3px solid #000; font-weight: bold;">
+<td style="border: 3px solid #000; padding: 8px; text-align: left; font-size: 12px;">NET PAY:</td>
+<td style="border: 3px solid #000; padding: 8px; text-align: center;"></td>
+<td style="border: 3px solid #000; padding: 8px; text-align: center;"></td>
+<td style="border: 3px solid #000; padding: 8px; text-align: center;"></td>
+<td style="border: 3px solid #000; padding: 8px; text-align: center;"></td>
+<td style="border: 3px solid #000; padding: 8px; text-align: center;"></td>
+<td style="border: 3px solid #000; padding: 8px; text-align: center;"></td>
+<td style="border: 3px solid #000; padding: 8px; text-align: right; font-size: 14px;">${payslip.totals.netPay}</td>
 </tr>`
   } else {
     // Original table structure when no deductions
     tableHTML += `
-<tr style="background: #e0e0e0; font-weight: bold;">
-<td colspan="4" style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">TOTAL PAY:</td>
+<tr style="border: 2px solid #000; font-weight: bold;">
+<td style="border: 2px solid #000; padding: 10px; text-align: left; font-size: 12px;">TOTAL PAY:</td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
 <td style="border: 2px solid #000; padding: 10px; text-align: center; font-size: 14px;">${payslip.totals.totalBags}</td>
+<td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
 <td style="border: 2px solid #000; padding: 10px; text-align: center;"></td>
 <td style="border: 2px solid #000; padding: 10px; text-align: right; font-size: 14px;">${payslip.totals.grossPay}</td>
 </tr>`
@@ -1931,15 +1975,13 @@ onMounted(() => {
 
 /* Special Table Rows */
 .totals-row {
-  background: linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%);
-  border-top: 2px solid #0277bd;
-  border-bottom: 2px solid #0277bd;
+  border-top: 2px solid #000;
+  border-bottom: 2px solid #000;
   font-weight: 700;
 }
 
 .totals-row td {
   padding: 1rem 0.75rem;
-  color: #0d47a1;
 }
 
 .totals-label-cell {
@@ -1953,39 +1995,29 @@ onMounted(() => {
 
 .totals-amount-cell {
   font-size: 1.1rem;
-  color: #0d47a1;
 }
 
 .deduction-row {
-  background: #fff3e0;
-  border-left: 4px solid #ff9800;
+  border-left: 4px solid #000;
 }
 
 .deduction-row td {
-  color: #e65100;
   font-weight: 500;
 }
 
 .total-deductions-row {
-  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
-  border-top: 2px solid #d32f2f;
-  border-bottom: 2px solid #d32f2f;
+  border-top: 2px solid #000;
+  border-bottom: 2px solid #000;
   font-weight: 700;
 }
 
-.total-deductions-row td {
-  color: #b71c1c;
-}
-
 .net-pay-row {
-  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-  border-top: 3px solid #2e7d32;
-  border-bottom: 3px solid #2e7d32;
+  border-top: 3px solid #000;
+  border-bottom: 3px solid #000;
   font-weight: 700;
 }
 
 .net-pay-row td {
-  color: #1b5e20;
   font-size: 1.1rem;
 }
 
@@ -3422,5 +3454,16 @@ onMounted(() => {
   .mobile-only {
     display: block;
   }
+}
+
+/* Separator Row Styles */
+.separator-row {
+  border-top: 2px solid #000;
+  border-bottom: 2px solid #000;
+}
+
+.separator-cell {
+  height: 8px;
+  background: #000;
 }
 </style>
