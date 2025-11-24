@@ -62,7 +62,7 @@
             <td class="invoice-cell">{{ trip.invoiceNumber }}</td>
             <td class="destination-cell">{{ trip.destination || trip.fullDestination }}</td>
             <td class="bags-cell text-center">{{ trip.numberOfBags || trip.number_of_bags }}</td>
-            <td class="rate-cell text-right">{{ trip.rate ? formatCurrency(trip.rate) : '0.00' }}</td>
+            <td class="rate-cell text-right">{{ trip.adjustedRate ? formatCurrency(trip.adjustedRate) : '0.00' }}</td>
             <td class="total-cell text-right">{{ trip.total ? formatCurrency(trip.total) : '0.00' }}</td>
           </tr>
 

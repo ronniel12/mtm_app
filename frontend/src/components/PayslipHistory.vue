@@ -487,7 +487,7 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`
 <td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.invoiceNumber}</td>
 <td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.destination}</td>
 <td style="border: 1px solid #000; padding: 6px; text-align: center;">${trip.numberOfBags}</td>
-<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip.rate ? formatCurrency(trip.rate) : '0.00'}</td>
+<td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip.adjustedRate ? formatCurrency(trip.adjustedRate) : '0.00'}</td>
 <td style="border: 1px solid #000; padding: 6px; text-align: right;">₱${trip.total ? formatCurrency(trip.total) : '0.00'}</td>
 </tr>`
     })
