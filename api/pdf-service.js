@@ -1,4 +1,5 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 const { put } = require('@vercel/blob');
 const PayslipRenderer = require('./payslip-renderer');
 const BillingRenderer = require('./billing-renderer');
@@ -6,21 +7,16 @@ require('dotenv').config();
 
 class PDFService {
   static async generatePayslipPDF(payslipData) {
+    let browser = null;
     try {
       console.log('📄 Starting PDF generation for payslip:', payslipData.payslipNumber);
 
-      // Launch puppeteer browser
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
+      // Launch puppeteer browser with Chromium
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
       });
 
       const page = await browser.newPage();
@@ -50,6 +46,13 @@ class PDFService {
       return pdfBuffer;
 
     } catch (error) {
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (closeError) {
+          console.warn('Could not close browser:', closeError.message);
+        }
+      }
       console.error('❌ PDF generation failed:', error);
       throw new Error(`PDF generation failed: ${error.message}`);
     }
@@ -110,21 +113,16 @@ class PDFService {
 
   // Billing PDF methods
   static async generateBillingPDF(billingData) {
+    let browser = null;
     try {
       console.log('📄 Starting PDF generation for billing:', billingData.billingNumber);
 
-      // Launch puppeteer browser
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
+      // Launch puppeteer browser with Chromium
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
       });
 
       const page = await browser.newPage();
@@ -154,6 +152,13 @@ class PDFService {
       return pdfBuffer;
 
     } catch (error) {
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (closeError) {
+          console.warn('Could not close browser:', closeError.message);
+        }
+      }
       console.error('❌ Billing PDF generation failed:', error);
       throw new Error(`Billing PDF generation failed: ${error.message}`);
     }
