@@ -41,7 +41,11 @@ export const API_ENDPOINTS = {
   FUEL: `${API_BASE_URL}/fuel`,
 
   // Tolls
-  TOLLS_CALCULATE: `${API_BASE_URL}/tolls/calculate`
+  TOLLS_CALCULATE: `${API_BASE_URL}/tolls/calculate`,
+
+  // Employee Deduction Configs
+  EMPLOYEE_DEDUCTION_CONFIGS: `${API_BASE_URL}/employee-deduction-configs`,
+  EMPLOYEE_DEDUCTION_CONFIGS_MATRIX: `${API_BASE_URL}/employee-deduction-configs/matrix`
 }
 
 // Helper function to create axios instance with base URL

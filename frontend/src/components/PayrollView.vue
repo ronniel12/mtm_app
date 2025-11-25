@@ -354,13 +354,20 @@
           <!-- Auto-Applied Deductions Info -->
           <div class="auto-deductions-info" v-if="deductions.length > 0">
             <div class="info-box">
-              <h4>✓ Auto-Applied Deductions:</h4>
-              <p style="color: #28a745; margin: 0.5rem 0;">
-                All saved deductions from your database have been automatically applied to this payslip.
+              <h4>✓ Applied Deductions:</h4>
+              <p style="color: #28a745; margin: 0.5rem 0; font-size: 0.9rem;">
+                Deductions are automatically applied based on employee configurations and staff additions.
               </p>
-              <div class="auto-deductions-list">
-                <div v-for="deduction in deductions" :key="deduction.name" class="auto-deduction-item">
-                  <strong>{{ deduction.name }}</strong> - {{ deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value) }}
+              <div class="deductions-breakdown-list">
+                <div v-for="deduction in deductions" :key="deduction.name + deduction.source" class="deduction-breakdown-item">
+                  <div class="deduction-name-source">
+                    <strong>{{ deduction.name }}</strong>
+                    <span class="source-badge" :class="deduction.source">{{ deduction.source === 'config' ? 'Configuration' : 'Standard' }}</span>
+                  </div>
+                  <div class="deduction-details">
+                    {{ deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value) }}
+                    <span class="calculated-amount">= ₱{{ formatCurrency(calculateDeductionAmount(deduction)) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -507,6 +514,7 @@
       </div>
     </div>
   </div>
+
 </template>
 
 <script setup>
@@ -679,18 +687,87 @@ const totalBags = computed(() => {
   return totals.totalBags
 })
 
-const autoApplySavedDeductions = () => {
-  if (selectedEmployeeUuid.value && startDate.value && endDate.value && availableDeductions.value.length > 0) {
-    // Clear current deductions and auto-apply all saved deductions
-    deductions.value = availableDeductions.value.map(deduction => ({
-      name: deduction.name,
-      type: deduction.type,
-      value: deduction.value
-    }))
+const applyEmployeeDeductionConfigurations = async () => {
+  // Clear existing deductions - we start fresh with configuration-driven deductions only
+  deductions.value = []
 
-    console.log('Auto-applied deductions:', deductions.value.length, 'items')
-  } else {
-    // Clear deductions if no filters selected
+  if (!selectedEmployeeUuid.value || !startDate.value || !endDate.value) {
+    return
+  }
+
+  try {
+    // Fetch employee's deduction configurations
+    const employeeId = selectedEmployeeUuid.value
+    const configsResponse = await axios.get(`${API_BASE_URL}/employee-deduction-configs?employee_uuid=${employeeId}`)
+    const configs = configsResponse.data
+
+    console.log('Employee deduction configs:', configs)
+
+    // Apply only deductions from employee configurations
+    const configDeductions = []
+
+    for (const config of configs) {
+      if (config.apply_mode === 'never') {
+        continue // Skip this deduction
+      }
+
+      if (config.apply_mode === 'always') {
+        // Apply this deduction always
+        const deduction = availableDeductions.value.find(d => d.id === config.deduction_id)
+        if (deduction) {
+          configDeductions.push({
+            name: deduction.name,
+            type: deduction.type,
+            value: deduction.value,
+            source: 'config',
+            configId: config.id,
+            isEditable: true
+          })
+        }
+        continue
+      }
+
+      if (config.apply_mode === 'selected_dates' && config.date_config) {
+        // Check if payslip period overlaps with configured dates
+        const periodStart = new Date(startDate.value)
+        const periodEnd = new Date(endDate.value)
+        periodEnd.setHours(23, 59, 59, 999)
+
+        let shouldApply = false
+
+        if (config.date_config.selected_dates && Array.isArray(config.date_config.selected_dates)) {
+          // Check for date overlap
+          for (const dateStr of config.date_config.selected_dates) {
+            const configDate = new Date(dateStr + 'T00:00:00') // Ensure local date
+            if (configDate >= periodStart && configDate <= periodEnd) {
+              shouldApply = true
+              break
+            }
+          }
+        }
+
+        if (shouldApply) {
+          const deduction = availableDeductions.value.find(d => d.id === config.deduction_id)
+          if (deduction) {
+            configDeductions.push({
+              name: deduction.name,
+              type: deduction.type,
+              value: deduction.value,
+              source: 'config',
+              configId: config.id,
+              isEditable: true
+            })
+          }
+        }
+      }
+    }
+
+    deductions.value = configDeductions
+    console.log('Applied deductions:', configDeductions.length, 'configuration-driven deductions')
+
+  } catch (error) {
+    console.error('Error applying employee deduction configurations:', error)
+    // No fallback to standard deductions - only apply configured deductions
     deductions.value = []
   }
 }
@@ -1040,8 +1117,8 @@ const filterEmployeeTripData = () => {
   // Generate new payslip number whenever filters change (especially dates)
   generatePayslipNumber()
 
-  // Auto-apply saved deductions when filters are valid
-  autoApplySavedDeductions()
+  // Auto-apply employee deduction configurations when filters are valid
+  applyEmployeeDeductionConfigurations()
 
   // This is called when filters change, computed property will automatically update
   console.log('Filtering with:', {
@@ -3465,5 +3542,31 @@ onMounted(() => {
 .separator-cell {
   height: 8px;
   background: #000;
+}
+
+/* Deduction Breakdown Styles */
+.deductions-breakdown-list {
+  margin-top: 1rem;
+}
+
+.deduction-breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 0.5rem;
+}
+
+.deduction-breakdown-item:last-child {
+  margin-bottom: 0;
+}
+
+.deduction-name-source {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 </style>

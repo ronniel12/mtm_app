@@ -11,6 +11,13 @@
         👥 Employees
       </button>
       <button
+        :class="{ active: activeTab === 'deductions' }"
+        @click="handleTabChange('deductions')"
+        class="tab-btn"
+      >
+        💸 Deductions
+      </button>
+      <button
         :class="{ active: activeTab === 'vehicles' }"
         @click="activeTab = 'vehicles'"
         class="tab-btn"
@@ -349,6 +356,223 @@
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Deductions Tab -->
+      <div v-if="activeTab === 'deductions'" class="tab-pane">
+        <div class="deductions-content">
+          <!-- Header with Stats -->
+          <div class="deductions-header">
+            <div class="header-left">
+              <h4 class="section-title">💸 Deduction Management</h4>
+              <p class="section-subtitle">Configure per-employee deduction schedules</p>
+            </div>
+            <div class="header-right">
+              <div class="stats-cards">
+                <div class="stat-card">
+                  <div class="stat-number">{{ deductionMatrix.length }}</div>
+                  <div class="stat-label">Configured Rules</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-number">{{ employees.length }}</div>
+                  <div class="stat-label">Employees</div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-number">{{ availableDeductions.length }}</div>
+                  <div class="stat-label">Deductions</div>
+                </div>
+              </div>
+              <button @click="loadDeductionMatrix" class="btn-refresh-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <polyline points="1 20 1 14 7 14"/>
+                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                </svg>
+                Refresh Matrix
+              </button>
+            </div>
+          </div>
+
+          <!-- Deduction Matrix -->
+          <div class="deduction-matrix-container">
+            <table class="deduction-matrix-table">
+              <thead>
+                <tr>
+                  <th class="employee-header">Employee</th>
+                  <th v-for="deduction in availableDeductions" :key="deduction.id" class="deduction-header">
+                    <div class="deduction-info">
+                      <div class="deduction-name">{{ deduction.name }}</div>
+                      <div class="deduction-type">{{ deduction.type === 'percentage' ? deduction.value + '%' : '₱' + formatCurrency(deduction.value) }}</div>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="employeeRow in deductionMatrix" :key="employeeRow.employee.uuid" class="employee-row">
+                  <td class="employee-cell">
+                    <div class="employee-info">
+                      <div class="employee-avatar-small">
+                        <span class="avatar-text">{{ getInitials(employeeRow.employee.name) }}</span>
+                      </div>
+                      <div class="employee-details-small">
+                        <div class="employee-name-small">{{ employeeRow.employee.name }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <!-- Loop through each deduction to create columns -->
+                  <td v-for="deduction in availableDeductions" :key="`${employeeRow.employee.uuid}-${deduction.id}`" class="config-cell">
+                    <div class="config-wrapper">
+                      <!-- Find the config for this employee + deduction combination -->
+                      <div class="config-status" :class="getConfigStatusClass(findConfigFor(employeeRow.employee.uuid, deduction.id))">
+                        <select
+                          :value="findConfigFor(employeeRow.employee.uuid, deduction.id).apply_mode"
+                          @change="updateDeductionConfig(
+                            employeeRow.employee.uuid,
+                            deduction.id, // Use the deduction from the header array
+                            $event.target.value,
+                            employeeRow.employee.name,
+                            deduction.name, // Use the deduction from the header array
+                            employeeRow.employee,
+                            deduction, // Pass the correct deduction object
+                            findConfigFor(employeeRow.employee.uuid, deduction.id)
+                          )"
+                          class="mode-select"
+                          :class="getModeSelectClass(findConfigFor(employeeRow.employee.uuid, deduction.id))"
+                        >
+                          <option value="never">Never</option>
+                          <option value="always">Always</option>
+                          <option value="selected_dates">Selected Dates</option>
+                        </select>
+
+                        <!-- Action Buttons -->
+                        <div class="config-actions" v-if="findConfigFor(employeeRow.employee.uuid, deduction.id).apply_mode !== 'never'">
+                          <button
+                            @click="openDateModal(employeeRow.employee, deduction, findConfigFor(employeeRow.employee.uuid, deduction.id))"
+                            class="btn-config-action edit"
+                            title="Edit dates"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                          </button>
+                          <button
+                            @click="deleteConfig(employeeRow.employee.uuid, deduction.id, employeeRow.employee.name, deduction.name, findConfigFor(employeeRow.employee.uuid, deduction.id))"
+                            class="btn-config-action delete"
+                            title="Remove configuration"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M3 6h18"/>
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                              <path d="M8 10l4 4"/>
+                              <path d="M12 10l4 4"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Date Preview for Selected Dates Mode -->
+                      <div v-if="findConfigFor(employeeRow.employee.uuid, deduction.id).apply_mode === 'selected_dates' && findConfigFor(employeeRow.employee.uuid, deduction.id).date_config?.selected_dates?.length"
+                           class="date-preview">
+                        <div class="date-count">
+                          📅 {{ findConfigFor(employeeRow.employee.uuid, deduction.id).date_config.selected_dates.length }} date{{ findConfigFor(employeeRow.employee.uuid, deduction.id).date_config.selected_dates.length === 1 ? '' : 's' }}
+                        </div>
+                        <div class="date-list-preview" v-if="findConfigFor(employeeRow.employee.uuid, deduction.id).date_config.selected_dates.length <= 3">
+                          <span v-for="date in findConfigFor(employeeRow.employee.uuid, deduction.id).date_config.selected_dates.slice(0, 3)"
+                                :key="date"
+                                class="date-chip">
+                            {{ formatDatePreview(date) }}
+                          </span>
+                        </div>
+                        <div class="date-range-preview" v-else>
+                          {{ formatDateRange(findConfigFor(employeeRow.employee.uuid, deduction.id).date_config.selected_dates) }}
+                        </div>
+                      </div>
+
+                      <!-- Always Mode Indicator -->
+                      <div v-if="findConfigFor(employeeRow.employee.uuid, deduction.id).apply_mode === 'always'" class="always-indicator">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                          <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        Active
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Instructions Card -->
+          <div class="instructions-card">
+            <div class="instruction-header">
+              <div class="instruction-icon">ℹ️</div>
+              <h5>How to Use</h5>
+            </div>
+            <div class="instruction-content">
+              <ul>
+                <li><strong>Never</strong>: Deduction is never applied to this employee's payslips</li>
+                <li><strong>Always</strong>: Deduction is applied to all payslips for this employee</li>
+                <li><strong>Selected Dates</strong>: Deduction is only applied when the payslip period overlaps with specific dates</li>
+              </ul>
+              <p><em>The deduction amounts are calculated from saved deductions in your Payroll Settings tab.</em></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Date Selection Modal -->
+      <div v-if="showDateModal" class="modal-overlay" @click="closeDateModal">
+        <div class="modal-content date-modal" @click.stop>
+          <div class="modal-header">
+            <h4>📅 Select Deduction Dates for {{ selectedEmployee?.name }} - {{ selectedDeduction?.name }}</h4>
+            <button @click="closeDateModal" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="calendar-section">
+              <div class="calendar-header">
+                <button @click="prevMonth" class="nav-btn">&larr;</button>
+                <h5>{{ formatCalendarMonth() }}</h5>
+                <button @click="nextMonth" class="nav-btn">&rarr;</button>
+              </div>
+              <div class="calendar-grid">
+                <div class="day-label" v-for="label in dayLabels" :key="label">{{ label }}</div>
+                <div
+                  v-for="day in calendarDays"
+                  :key="day.date"
+                  :class="[
+                    'calendar-day',
+                    day.isCurrentMonth ? 'current-month' : 'other-month',
+                    isDateSelected(day.date) ? 'selected' : '',
+                    isToday(day.date) ? 'today' : ''
+                  ]"
+                  @click="toggleDateSelection(day.date)"
+                >
+                  {{ day.dayNumber }}
+                </div>
+              </div>
+            </div>
+            <div class="selected-dates-section">
+              <h5>📋 Selected Dates ({{ selectedDates.length }})</h5>
+              <div class="selected-dates-list">
+                <div
+                  v-for="date in selectedDates"
+                  :key="date"
+                  class="selected-date-item"
+                >
+                  <span>{{ formatDateReadable(date) }}</span>
+                  <button @click="removeDateSelection(date)" class="remove-date-btn">&times;</button>
+                </div>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button @click="clearAllDates" class="btn-clear-dates">Clear All</button>
+              <button @click="saveDateSelections" class="btn-save-dates">Save Selections</button>
             </div>
           </div>
         </div>
@@ -764,6 +988,18 @@ const editingVehicle = ref(null)
 const editingRate = ref(null)
 const isRefreshingRates = ref(false)
 const ratesLastUpdated = ref(null)
+
+// Deductions
+const deductionMatrix = ref([])
+const availableDeductions = ref([])
+const showDateModal = ref(false)
+const selectedEmployee = ref(null)
+const selectedDeduction = ref(null)
+const selectedConfig = ref(null)
+const selectedDates = ref([])
+const calendarDays = ref([])
+const currentMonth = ref(new Date())
+const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const employeeForm = ref({
   name: '',
   phone: '',
@@ -812,6 +1048,10 @@ const groupedRates = computed(() => {
 
 onMounted(() => {
   fetchSettings()
+  // Load deductions data when deductions tab is active
+  if (activeTab.value === 'deductions') {
+    loadDeductionsData()
+  }
 })
 
 const fetchSettings = async () => {
@@ -1092,6 +1332,206 @@ const checkRates = async () => {
   }
 }
 
+// Deductions functions
+const loadDeductionsData = async () => {
+  try {
+    // Fetch deductions from payroll settings
+    const [deductionsRes, matrixRes] = await Promise.all([
+      axios.get(`${API_BASE_URL}/deductions`),
+      axios.get(`${API_BASE_URL}/employee-deduction-configs/matrix`)
+    ])
+
+    availableDeductions.value = deductionsRes.data
+    deductionMatrix.value = matrixRes.data.matrix
+  } catch (error) {
+    console.error('Error loading deduction data:', error)
+    // Fallback to empty data
+    availableDeductions.value = []
+    deductionMatrix.value = []
+  }
+}
+
+const updateDeductionConfig = async (employeeUuid, deductionId, applyMode, employeeName, deductionName, employee, deduction, config) => {
+  try {
+    // Debug logging to verify the deduction ID matches expectation
+    console.log('🎯 updateDeductionConfig called with:', {
+      employeeUuid,
+      deductionId,
+      applyMode,
+      deductionName,
+      availableDeductionsCount: availableDeductions.value.length,
+      availableDeductionsNames: availableDeductions.value.map(d => `${d.id}:${d.name}`)
+    })
+
+    const payload = {
+      employee_uuid: employeeUuid,
+      deduction_id: deductionId,
+      apply_mode: applyMode
+    }
+
+    await axios.post(`${API_BASE_URL}/employee-deduction-configs`, payload)
+    console.log(`✅ Updated ${employeeName}'s ${deductionName} (ID:${deductionId}) config to ${applyMode}`)
+
+    // If selected "selected_dates" mode, automatically open the date picker
+    if (applyMode === 'selected_dates') {
+      openDateModal(employee, deduction, config)
+    }
+  } catch (error) {
+    console.error('❌ Error updating deduction config:', error)
+    alert('Error updating deduction configuration. Please try again.')
+  }
+}
+
+// Date modal functions
+const openDateModal = (employee, deduction, config) => {
+  selectedEmployee.value = employee
+  selectedDeduction.value = deduction
+  selectedConfig.value = config
+  selectedDates.value = config.date_config?.selected_dates || []
+  currentMonth.value = new Date()
+  generateCalendarDays()
+  showDateModal.value = true
+}
+
+const closeDateModal = () => {
+  showDateModal.value = false
+  selectedEmployee.value = null
+  selectedDeduction.value = null
+  selectedConfig.value = null
+  selectedDates.value = []
+}
+
+const generateCalendarDays = () => {
+  const days = []
+  const year = currentMonth.value.getFullYear()
+  const month = currentMonth.value.getMonth()
+
+  // Get first day of the month and last day
+  const firstDay = new Date(year, month, 1).getDay()
+  const lastDate = new Date(year, month + 1, 0).getDate()
+
+  // Get last day of previous month
+  const prevLastDate = new Date(year, month, 0).getDate()
+
+  // Add previous month's days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const date = new Date(year, month - 1, prevLastDate - i)
+    days.push({
+      date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+      dayNumber: prevLastDate - i,
+      isCurrentMonth: false
+    })
+  }
+
+  // Add current month's days
+  for (let i = 1; i <= lastDate; i++) {
+    const date = new Date(year, month, i)
+    days.push({
+      date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+      dayNumber: i,
+      isCurrentMonth: true
+    })
+  }
+
+  // Add next month's days to fill the grid
+  const remainingDays = 42 - days.length // 6 rows * 7 days
+  for (let i = 1; i <= remainingDays; i++) {
+    const date = new Date(year, month + 1, i)
+    days.push({
+      date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+      dayNumber: i,
+      isCurrentMonth: false
+    })
+  }
+
+  calendarDays.value = days
+}
+
+const prevMonth = () => {
+  currentMonth.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() - 1, 1)
+  generateCalendarDays()
+}
+
+const nextMonth = () => {
+  currentMonth.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() + 1, 1)
+  generateCalendarDays()
+}
+
+const formatCalendarMonth = () => {
+  return currentMonth.value.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
+const isDateSelected = (dateString) => {
+  return selectedDates.value.includes(dateString)
+}
+
+const isToday = (dateString) => {
+  const today = new Date().toISOString().split('T')[0]
+  return dateString === today
+}
+
+const toggleDateSelection = (dateString) => {
+  const index = selectedDates.value.indexOf(dateString)
+  if (index > -1) {
+    selectedDates.value.splice(index, 1)
+  } else {
+    selectedDates.value.push(dateString)
+  }
+}
+
+const removeDateSelection = (dateString) => {
+  const index = selectedDates.value.indexOf(dateString)
+  if (index > -1) {
+    selectedDates.value.splice(index, 1)
+  }
+}
+
+const clearAllDates = () => {
+  selectedDates.value = []
+}
+
+const saveDateSelections = async () => {
+  try {
+    const payload = {
+      employee_uuid: selectedEmployee.value.uuid,
+      deduction_id: selectedDeduction.value.id,
+      apply_mode: 'selected_dates',
+      date_config: {
+        selected_dates: selectedDates.value
+      }
+    }
+
+    await axios.post(`${API_BASE_URL}/employee-deduction-configs`, payload)
+    console.log(`Updated ${selectedEmployee.value.name}'s ${selectedDeduction.value.name} dates`)
+    closeDateModal()
+    await loadDeductionMatrix()
+  } catch (error) {
+    console.error('Error saving date selections:', error)
+    alert('Error saving date selections. Please try again.')
+  }
+}
+
+const formatDateReadable = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  })
+}
+
+// Tab change handler to load data when needed
+const handleTabChange = (tab) => {
+  activeTab.value = tab
+  if (tab === 'deductions') {
+    loadDeductionMatrix()
+  }
+}
+
+const loadDeductionMatrix = async () => {
+  await loadDeductionsData()
+}
+
 // Helper function to get initials from name
 const getInitials = (name) => {
   if (!name) return 'U'
@@ -1101,6 +1541,76 @@ const getInitials = (name) => {
     .join('')
     .toUpperCase()
     .slice(0, 2)
+}
+
+// Helper functions for deductions configuration
+const getConfigStatusClass = (config) => {
+  if (!config || config.apply_mode === 'never') return 'status-never'
+  if (config.apply_mode === 'always') return 'status-always'
+  if (config.apply_mode === 'selected_dates') return 'status-selected'
+  return 'status-never'
+}
+
+const getModeSelectClass = (applyMode) => {
+  return `mode-${applyMode || 'never'}`
+}
+
+// Date preview functions
+const formatDatePreview = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const formatDateRange = (dates) => {
+  if (!dates || dates.length === 0) return ''
+
+  // Sort dates
+  const sortedDates = dates.sort()
+  const firstDate = new Date(sortedDates[0])
+  const lastDate = new Date(sortedDates[sortedDates.length - 1])
+
+  if (sortedDates.length <= 3) {
+    // Show individual dates
+    return sortedDates.map(d => formatDatePreview(d)).join(', ')
+  } else {
+    // Show range
+    return `${formatDatePreview(firstDate)} - ${formatDatePreview(lastDate)} (${dates.length} dates)`
+  }
+}
+
+// Helper method to find config for specific employee + deduction combination
+const findConfigFor = (employeeUuid, deductionId) => {
+  // Find the employee row that matches the employeeUuid
+  const employeeRow = deductionMatrix.value.find(row => row.employee.uuid === employeeUuid)
+  if (!employeeRow) {
+    return { apply_mode: 'never', date_config: null }
+  }
+
+  // Find the config for this specific deduction within the employee's configs
+  const configItem = employeeRow.configs.find(config =>
+    config.deduction.id === deductionId
+  )
+
+  return configItem ? configItem.config : { apply_mode: 'never', date_config: null }
+}
+
+// CRUD operations for deduction configurations
+const deleteConfig = async (employeeUuid, deductionId, employeeName, deductionName, config) => {
+  if (!confirm(`Are you sure you want to delete the deduction configuration for ${employeeName} - ${deductionName}?`)) {
+    return
+  }
+
+  try {
+    await axios.delete(`${API_BASE_URL}/employee-deduction-configs/${employeeUuid}/${deductionId}`)
+    console.log(`Deleted ${employeeName}'s ${deductionName} config`)
+
+    // Refresh the matrix
+    await loadDeductionMatrix()
+  } catch (error) {
+    console.error('Error deleting deduction config:', error)
+    alert('Error deleting deduction configuration. Please try again.')
+  }
 }
 </script>
 
@@ -2931,6 +3441,644 @@ const getInitials = (name) => {
   .detail-row {
     flex-direction: column;
     gap: 0.5rem;
+  }
+}
+
+/* Deductions Styles */
+.deductions-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.deductions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.deduction-matrix-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  overflow-x: auto;
+}
+
+.deduction-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  background: white;
+}
+
+.deduction-matrix-table th,
+.deduction-matrix-table td {
+  padding: 0.75rem;
+  text-align: center;
+  border-bottom: 1px solid #dee2e6;
+  border-right: 1px solid #dee2e6;
+}
+
+.deduction-matrix-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #333;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.deduction-matrix-table th:last-child,
+.deduction-matrix-table td:last-child {
+  border-right: none;
+}
+
+.employee-header {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #333;
+}
+
+.deduction-header {
+  font-weight: 500;
+}
+
+.deduction-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.deduction-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.8rem;
+}
+
+.deduction-type {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.employee-cell {
+  min-width: 200px;
+}
+
+.employee-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.employee-avatar-small {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+}
+
+.employee-details-small {
+  text-align: left;
+}
+
+.employee-name-small {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.config-cell {
+  min-width: 120px;
+}
+
+.config-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mode-select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.mode-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.btn-date-picker {
+  background: #17a2b8;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-date-picker:hover {
+  background: #138496;
+}
+
+.selected-dates-count {
+  font-size: 0.7rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+.instructions-card {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 4px solid #667eea;
+}
+
+.instruction-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.instruction-icon {
+  font-size: 1.5rem;
+}
+
+.instruction-header h5 {
+  margin: 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.instructions-card ul {
+  padding-left: 1.5rem;
+  margin: 0 0 1rem 0;
+}
+
+.instructions-card li {
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.instructions-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Date Modal Styles */
+.date-modal {
+  max-width: 600px;
+}
+
+.calendar-section {
+  margin-bottom: 2rem;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0 1rem;
+}
+
+.calendar-header h5 {
+  margin: 0;
+  color: #333;
+  font-weight: 600;
+}
+
+.nav-btn {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.nav-btn:hover {
+  background: #e9ecef;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 1rem;
+}
+
+.day-label {
+  padding: 0.5rem;
+  text-align: center;
+  font-weight: 600;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.calendar-day {
+  padding: 0.75rem;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.calendar-day:hover {
+  background: #e9ecef;
+}
+
+.calendar-day.current-month {
+  background: white;
+}
+
+.calendar-day.other-month {
+  color: #adb5bd;
+  background: #f8f9fa;
+}
+
+.calendar-day.selected {
+  background: #007bff;
+  color: white;
+}
+
+.calendar-day.today {
+  background: #fff3cd;
+  color: #856404;
+  font-weight: 600;
+}
+
+.selected-dates-section {
+  margin-bottom: 2rem;
+}
+
+.selected-dates-section h5 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.selected-dates-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.selected-date-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #e9ecef;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.remove-date-btn {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 1rem;
+  transition: background 0.2s;
+}
+
+.remove-date-btn:hover {
+  background: rgba(220, 53, 69, 0.1);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #dee2e6;
+}
+
+.btn-clear-dates {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.btn-clear-dates:hover {
+  background: #5a6268;
+}
+
+.btn-save-dates {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.btn-save-dates:hover {
+  background: #218838;
+}
+
+/* Configuration Status Classes */
+.status-never {
+  background: #f8f9fa !important;
+}
+
+.mode-never .mode-select {
+  background: linear-gradient(to right, #f8f9fa 0%, #e2e8f0 100%) !important;
+  border-color: #dee2e6 !important;
+}
+
+.status-always {
+  background: #d4edda !important;
+  border-color: #c3e6cb !important;
+}
+
+.mode-always .mode-select {
+  background: linear-gradient(to right, #d4edda 0%, #c3e6cb 100%) !important;
+  border-color: #28a745 !important;
+  color: #155724 !important;
+  font-weight: 500 !important;
+}
+
+.status-selected {
+  background: #cce7ff !important;
+  border-color: #b6d9ff !important;
+}
+
+.mode-selected_dates .mode-select {
+  background: linear-gradient(to right, #cce7ff 0%, #b6d9ff 100%) !important;
+  border-color: #007bff !important;
+  color: #004085 !important;
+  font-weight: 500 !important;
+}
+
+/* Configuration Actions */
+.config-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.btn-config-action {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-config-action.edit {
+  background: #007bff;
+  color: white;
+}
+
+.btn-config-action.edit:hover {
+  background: #0056b3;
+  transform: scale(1.1);
+}
+
+.btn-config-action.delete {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-config-action.delete:hover {
+  background: #c82333;
+  transform: scale(1.1);
+}
+
+/* Date Preview */
+.date-preview {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 0.5rem;
+  min-width: 100px;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.date-count {
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 0.25rem;
+}
+
+.date-list-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.date-chip {
+  background: #e9ecef;
+  color: #495057;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.date-range-preview {
+  font-style: italic;
+  color: #6c757d;
+}
+
+/* Always Mode Indicator */
+.always-indicator {
+  background: #28a745;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Mobile responsiveness for deductions */
+@media (max-width: 768px) {
+  .deductions-header {
+    flex-direction: column;
+    gap: 1.5rem;
+    text-align: center;
+    padding: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .deduction-matrix-container {
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .deduction-matrix-table {
+    font-size: 0.75rem;
+  }
+
+  .deduction-matrix-table th,
+  .deduction-matrix-table td {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .employee-cell {
+    min-width: 150px;
+  }
+
+  .employee-info {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .employee-avatar-small {
+    width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+  }
+
+  .employee-details-small {
+    text-align: center;
+  }
+
+  .config-wrapper {
+    gap: 0.25rem;
+  }
+
+  .mode-select {
+    font-size: 0.75rem;
+    padding: 0.4rem;
+  }
+
+  .btn-config-action {
+    width: 22px;
+    height: 22px;
+  }
+
+  .date-preview {
+    padding: 0.4rem;
+    min-width: 80px;
+    font-size: 0.7rem;
+  }
+
+  .date-count {
+    font-size: 0.75rem;
+  }
+
+  .btn-date-picker {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.7rem;
+  }
+
+  .instructions-card {
+    padding: 1rem;
+  }
+
+  .instruction-header {
+    gap: 0.5rem;
+  }
+
+  .instruction-icon {
+    font-size: 1.2rem;
+  }
+
+  .instruction-header h5 {
+    font-size: 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+
+  .calendar-section {
+    margin-bottom: 1.5rem;
+  }
+
+  .calendar-header {
+    padding: 0 0.5rem;
+  }
+
+  .calendar-header h5 {
+    font-size: 0.9rem;
+  }
+
+  .calendar-day {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .selected-dates-section h5 {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .selected-date-item {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .modal-actions {
+    padding-top: 1rem;
+  }
+
+  .btn-clear-dates,
+  .btn-save-dates {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.85rem;
   }
 }
 </style>

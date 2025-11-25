@@ -134,6 +134,22 @@ async function createTables() {
       console.log('ℹ️ updated_at column may already exist in deductions table:', error.message);
     }
 
+    // Create employee_deduction_configs table
+    await query(`
+      CREATE TABLE IF NOT EXISTS employee_deduction_configs (
+        id SERIAL PRIMARY KEY,
+        employee_uuid VARCHAR(36) REFERENCES employees(uuid) ON DELETE CASCADE,
+        deduction_id INTEGER REFERENCES deductions(id) ON DELETE CASCADE,
+        apply_mode VARCHAR(50) DEFAULT 'never',
+        date_config JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(employee_uuid, deduction_id)
+      )
+    `);
+
+    console.log('✅ Created employee_deduction_configs table');
+
     // Create vehicles table
     await query(`
       CREATE TABLE IF NOT EXISTS vehicles (
