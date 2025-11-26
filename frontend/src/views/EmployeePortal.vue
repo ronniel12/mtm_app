@@ -159,6 +159,15 @@
         </div>
       </div>
     </div>
+
+    <!-- Hidden PDF Generation Modal -->
+    <div v-if="pdfModalOpen && tempPayslip" class="modal-overlay pdf-modal" style="display: none;" aria-hidden="true">
+      <div class="modal-content large-modal">
+        <div class="modal-body">
+          <PayslipPreview :payslip="tempPayslip" />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -168,7 +177,13 @@ import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { API_BASE_URL } from '@/api/config'
 import { useAuth } from '@/composables/useAuth'
+import { useClientPayslipPDF } from '@/composables/useClientPayslipPDF'
 import PayslipPreview from '@/components/PayslipPreview.vue'
+
+// Client-side PDF service
+const { openPDFInNewTab } = useClientPayslipPDF()
+const pdfModalOpen = ref(false)
+const tempPayslip = ref(null)
 
 // Reactive data
 const route = useRoute()
@@ -260,24 +275,62 @@ const downloadPayslip = async (payslip) => {
       return
     }
 
-    // Generate PDF on-demand for employee payslips
-    console.log('📄 Generating PDF for employee payslip:', payslip.payslipNumber)
-    const pdfResponse = await axios.post(`${API_BASE_URL}/payslips/generate-pdf`, payslip, {
-      responseType: 'blob',
-      headers: {
-        'Content-Type': 'application/json'
+    // Try server-side PDF generation first
+    try {
+      console.log('📄 Generating server-side PDF for employee payslip:', payslip.payslipNumber)
+      const pdfResponse = await axios.post(`${API_BASE_URL}/payslips/generate-pdf`, payslip, {
+        responseType: 'blob',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (pdfResponse.data && pdfResponse.data.size > 0) {
+        // Create blob URL from response
+        const blob = new Blob([pdfResponse.data], { type: 'application/pdf' })
+        const blobUrl = URL.createObjectURL(blob)
+        window.open(blobUrl, '_blank')
+
+        console.log('✅ Server-side PDF generated and opened successfully')
+        return
+      } else {
+        throw new Error('Server PDF generation failed - empty response')
       }
-    })
 
-    if (pdfResponse.data && pdfResponse.data.size > 0) {
-      // Create blob URL from response
-      const blob = new Blob([pdfResponse.data], { type: 'application/pdf' })
-      const blobUrl = URL.createObjectURL(blob)
-      window.open(blobUrl, '_blank')
+    } catch (serverError) {
+      console.warn('Server PDF generation failed, falling back to client-side:', serverError.message)
 
-      console.log('✅ PDF generated and opened successfully')
-    } else {
-      throw new Error('PDF generation failed - empty response')
+      // Fallback to client-side PDF generation
+      console.log('📄 Falling back to client-side PDF generation for employee payslip:', payslip.payslipNumber)
+
+      // Create temporary modal with payslip data to render PayslipPreview
+      tempPayslip.value = {
+        ...payslip,
+        employee: {
+          name: employee.value?.name || payslip.employeeName,
+          position: 'N/A' // Employee portal does not track position info
+        },
+        period: {
+          periodText: payslip.period || 'Period not specified'
+        },
+        preparedBy: payslip.preparedBy || 'MTM Enterprise System'
+      }
+
+      pdfModalOpen.value = true
+
+      // Wait for the modal to render
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Get the PayslipPreview element from the temporary modal
+      const payslipElement = document.querySelector('.pdf-modal .payslip-preview')
+      if (!payslipElement) {
+        throw new Error('Payslip preview element not found')
+      }
+
+      // Generate and open PDF
+      await openPDFInNewTab(payslipElement, payslip)
+
+      console.log('✅ Client-side PDF generated and opened successfully')
     }
 
   } catch (error) {
@@ -285,13 +338,16 @@ const downloadPayslip = async (payslip) => {
     const payslipNumber = payslip?.payslipNumber || 'Unknown'
 
     if (error.response?.status === 404) {
-      alert(`PDF Generation Not Supported: ${payslipNumber}\n\nPDF generation is currently not available for employee payslips.\n\nPlease contact your administrator or use the admin payroll view for PDF downloads.`)
+      alert(`PDF Generation Not Supported: ${payslipNumber}\n\nPDF generation is currently not available.\n\nPlease contact your administrator.`)
     } else {
-      alert(`PDF Generation Failed: ${payslipNumber}\n\nUnable to generate PDF. Please try again later or contact support.\n\nError: ${error.message}`)
+      alert(`PDF Generation Failed: ${payslipNumber}\n\nAll PDF generation methods failed. Please try again later or contact support.\n\nError: ${error.message}`)
     }
   } finally {
     const downloadBtn = document.querySelector('.btn-download')
     if (downloadBtn) downloadBtn.textContent = '📄 PDF'
+    // Ensure modal is closed in case of error
+    pdfModalOpen.value = false
+    tempPayslip.value = null
   }
 }
 
