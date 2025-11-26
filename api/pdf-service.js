@@ -1,4 +1,5 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 const { put } = require('@vercel/blob');
 const PayslipRenderer = require('./payslip-renderer');
 const BillingRenderer = require('./billing-renderer');
@@ -18,17 +19,9 @@ class PDFService {
     if (isVercel) {
       console.log('🌐 Running in Vercel serverless environment');
       return {
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-sm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process', // Important for serverless
-          '--disable-gpu'
-        ]
+        executablePath: await chromium.executablePath(),
+        args: chromium.args,
+        headless: chromium.headless
       };
     } else {
       console.log('💻 Running locally');
