@@ -20,8 +20,14 @@ class PDFService {
       console.log('🌐 Running in Vercel serverless environment');
       return {
         executablePath: await chromium.executablePath(),
-        args: chromium.args,
-        headless: chromium.headless
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--single-process',
+          '--no-zygote'
+        ],
+        headless: true
       };
     } else {
       console.log('💻 Running locally');

@@ -275,69 +275,47 @@ const downloadPayslip = async (payslip) => {
       return
     }
 
-    // Try server-side PDF generation first
-    try {
-      console.log('📄 Generating server-side PDF for employee payslip:', payslip.payslipNumber)
-      const pdfResponse = await axios.post(`${API_BASE_URL}/payslips/generate-pdf`, payslip, {
-        responseType: 'blob',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+    // Always use client-side PDF generation for Vercel compatibility
+    // (Vercel serverless has browser library issues, so we skip server-side attempts)
+    console.log('📄 Using client-side PDF generation for employee payslip:', payslip.payslipNumber)
 
-      if (pdfResponse.data && pdfResponse.data.size > 0) {
-        // Create blob URL from response
-        const blob = new Blob([pdfResponse.data], { type: 'application/pdf' })
-        const blobUrl = URL.createObjectURL(blob)
-        window.open(blobUrl, '_blank')
+    // Client-side PDF generation
+    console.log('📄 Starting client-side PDF generation for employee payslip:', payslip.payslipNumber)
 
-        console.log('✅ Server-side PDF generated and opened successfully')
-        return
-      } else {
-        throw new Error('Server PDF generation failed - empty response')
-      }
-
-    } catch (serverError) {
-      console.warn('Server PDF generation failed, falling back to client-side:', serverError.message)
-
-      // Fallback to client-side PDF generation
-      console.log('📄 Falling back to client-side PDF generation for employee payslip:', payslip.payslipNumber)
-
-      // Create temporary modal with payslip data to render PayslipPreview
-      tempPayslip.value = {
-        ...payslip,
-        employee: {
-          name: employee.value?.name || payslip.employeeName,
-          position: 'N/A' // Employee portal does not track position info
-        },
-        period: {
-          periodText: payslip.period || 'Period not specified'
-        },
-        preparedBy: payslip.preparedBy || 'MTM Enterprise System'
-      }
-
-      pdfModalOpen.value = true
-
-      // Wait for the modal to render completely (Vue component + DOM painting)
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Get the PayslipPreview element from the temporary modal
-      const payslipElement = document.querySelector('.pdf-modal .payslip-preview')
-      if (!payslipElement) {
-        throw new Error('Payslip preview element not found')
-      }
-
-      // Ensure the element is visible and has computed styles
-      const computedStyle = window.getComputedStyle(payslipElement)
-      if (computedStyle.display === 'none' || payslipElement.offsetHeight === 0) {
-        throw new Error('Payslip preview element is not visible or rendered')
-      }
-
-      // Generate and open PDF
-      await openPDFInNewTab(payslipElement, payslip)
-
-      console.log('✅ Client-side PDF generated and opened successfully')
+    // Create temporary modal with payslip data to render PayslipPreview
+    tempPayslip.value = {
+      ...payslip,
+      employee: {
+        name: employee.value?.name || payslip.employeeName,
+        position: 'N/A' // Employee portal does not track position info
+      },
+      period: {
+        periodText: payslip.period || 'Period not specified'
+      },
+      preparedBy: payslip.preparedBy || 'MTM Enterprise System'
     }
+
+    pdfModalOpen.value = true
+
+    // Wait for the modal to render completely (Vue component + DOM painting)
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    // Get the PayslipPreview element from the temporary modal
+    const payslipElement = document.querySelector('.pdf-modal .payslip-preview')
+    if (!payslipElement) {
+      throw new Error('Payslip preview element not found')
+    }
+
+    // Ensure the element is visible and has computed styles
+    const computedStyle = window.getComputedStyle(payslipElement)
+    if (computedStyle.display === 'none' || payslipElement.offsetHeight === 0) {
+      throw new Error('Payslip preview element is not visible or rendered')
+    }
+
+    // Generate and open PDF
+    await openPDFInNewTab(payslipElement, payslip)
+
+    console.log('✅ Client-side PDF generated and opened successfully')
 
   } catch (error) {
     console.error('Error downloading payslip:', error)

@@ -1,5 +1,11 @@
 {
   "version": 2,
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "@vercel/node"
+    }
+  },
+  "buildCommand": "npm run build",
   "builds": [
     {
       "src": "frontend/package.json",
@@ -7,10 +13,6 @@
       "config": {
         "distDir": "dist"
       }
-    },
-    {
-      "src": "api/server.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
