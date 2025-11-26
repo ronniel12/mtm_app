@@ -318,13 +318,19 @@ const downloadPayslip = async (payslip) => {
 
       pdfModalOpen.value = true
 
-      // Wait for the modal to render
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Wait for the modal to render completely (Vue component + DOM painting)
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
       // Get the PayslipPreview element from the temporary modal
       const payslipElement = document.querySelector('.pdf-modal .payslip-preview')
       if (!payslipElement) {
         throw new Error('Payslip preview element not found')
+      }
+
+      // Ensure the element is visible and has computed styles
+      const computedStyle = window.getComputedStyle(payslipElement)
+      if (computedStyle.display === 'none' || payslipElement.offsetHeight === 0) {
+        throw new Error('Payslip preview element is not visible or rendered')
       }
 
       // Generate and open PDF

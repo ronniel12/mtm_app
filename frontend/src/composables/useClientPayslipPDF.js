@@ -23,18 +23,51 @@ export function useClientPayslipPDF() {
     } = options
 
     try {
-      // Configure html2canvas options for better quality
+      // Wait for fonts and images to load
+      await document.fonts.ready
+
+      // Small delay to ensure Vue component is fully rendered
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Make element temporarily visible if hidden (for modal rendering)
+      const originalDisplay = element.style.display
+      const originalVisibility = element.style.visibility
+      if (element.style.display === 'none') {
+        element.style.display = 'block'
+        element.style.visibility = 'hidden'
+        element.style.position = 'absolute'
+        element.style.left = '-9999px'
+        element.style.top = '-9999px'
+        await new Promise(resolve => setTimeout(resolve, 200))
+      }
+
+      // Configure html2canvas options for better quality and reliability
       const canvas = await html2canvas(element, {
-        scale: 2, // Higher resolution
+        scale: 1.5, // Reasonable resolution
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false, // Don't allow tainted canvases
         backgroundColor: '#ffffff',
         width: element.scrollWidth,
         height: element.scrollHeight,
         logging: false,
+        removeContainer: true,
+        imageTimeout: 5000,
         // Timeout to prevent hanging
-        timeout: 10000
+        timeout: 15000,
+        // Force font loading
+        letterRendering: true,
+        // Better text rendering
+        foreignObjectRendering: false
       })
+
+      // Restore original display if it was changed
+      if (originalDisplay !== '') {
+        element.style.display = originalDisplay
+        element.style.visibility = originalVisibility
+        element.style.position = ''
+        element.style.left = ''
+        element.style.top = ''
+      }
 
       // Get canvas dimensions
       const imgData = canvas.toDataURL('image/png')
