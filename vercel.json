@@ -1,36 +1,25 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "@vercel/node"
-    }
-  },
+
+  "outputDirectory": "frontend/dist",
   "buildCommand": "npm run build",
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
+
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "/api/server.js"
     },
     {
-      "src": "/frontend/assets/(.*)",
-      "dest": "/frontend/assets/$1"
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
     },
     {
       "src": "/(.*)\\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|eot|ttf|ico)$",
-      "dest": "/frontend/$1.$2"
+      "dest": "/$1.$2"
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend/index.html"
+      "dest": "/index.html"
     }
   ],
 

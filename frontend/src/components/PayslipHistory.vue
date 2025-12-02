@@ -454,21 +454,23 @@ const printPayslip = (payslip) => {
   if (confirm('Do you want to print this payslip?')) {
     // Check if PDF blob URL is available
     const payslipDetails = getSafeDetails(payslip)
-    console.log('Checking for blob URL:', payslipDetails?.blobUrl)
 
     if (payslipDetails?.blobUrl) {
       // Use the pre-generated PDF blob URL
-      console.log('Using pre-generated PDF:', payslipDetails.blobUrl)
       window.open(payslipDetails.blobUrl, '_blank')
       return
     }
 
     // Fallback to HTML generation if no PDF blob URL
-    console.log('No PDF blob URL found, generating HTML for print')
 
     // Import payslip renderer for consistent fallback
     import('../composables/usePayslipRenderer.js').then(renderer => {
-      const htmlContent = renderer.default.generatePayslipHTML(payslip, true)
+      // Prepare payslip data with proper createdDate field for the renderer
+      const payslipForPrint = {
+        ...payslip,
+        createdDate: payslip.displayCreatedDate || payslip.created_date || payslip.createdDate
+      }
+      const htmlContent = renderer.default.generatePayslipHTML(payslipForPrint, true)
 
       // Create new window with consistent content
       const printWindow = window.open('', '_blank')
@@ -539,7 +541,6 @@ const togglePayslipStatus = async (payslip) => {
       // Update local data
       payslip.status = newStatus
 
-      console.log('Updated payslip status:', payslip.id, newStatus)
       alert(`Payslip ${payslip.displayNumber} marked as ${newStatus === 'approved' ? 'Approved' : 'Pending'}`)
       return
     }
@@ -554,7 +555,6 @@ const togglePayslipStatus = async (payslip) => {
     const savedPayslips = JSON.stringify(allPayslips.value)
     localStorage.setItem('payslips', savedPayslips)
 
-    console.log('Updated payslip status locally:', payslip.id, newStatus)
     alert(`Payslip ${payslip.displayNumber} marked as ${newStatus === 'approved' ? 'Approved' : 'Pending'} (stored locally)`)
 
   } catch (localError) {
@@ -578,9 +578,7 @@ const handlePayslipUpdated = (updatedPayslip) => {
 
 // 📡 Listen for payslip creation/deletion events to refresh the list
 onRefresh('payslips', async () => {
-  console.log('🔄 Payslip refresh triggered - reloading payslips...')
   await fetchPayslips()
-  console.log('✅ Payslip history refreshed')
 })
 
 // Lifecycle

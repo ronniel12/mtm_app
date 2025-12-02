@@ -301,7 +301,6 @@ const submitForm = async () => {
       }
     }
 
-    console.log('Submitting trip data:', data)
 
     if (isEditing.value && props.editTrip) {
       await axios.put(`${API_BASE_URL}/trips/${props.editTrip.id}`, data)

@@ -244,7 +244,7 @@ const exportPDF = async () => {
 798 Maharlika Highway, Dampol 2nd A<br>
 Pulilan Bulacan, 3005<br>
 TIN #007-932-128-000<br>
-Business Style: 007-932-128-000`
+Business Style: Premium Feeds Corp.`
 
   const companyInfo = `MTM ENTERPRISE<br>
 0324 P. Damaso St. Virgen Delas Flores Baliuag Bulacan<br>
@@ -340,8 +340,7 @@ ${companyInfo}
 
 <div class="billing-info-pdf">
 <strong>Billing Number:</strong> ${billingNumber.value}<br>
-<strong>Period Covered:</strong> ${formatPeriod()}<br>
-<strong>Date Generated:</strong> ${formatDate(new Date())}
+<strong>Period Covered:</strong> ${formatPeriod()}
 </div>
 
 ${tableHTML}
@@ -396,7 +395,7 @@ const exportExcel = async () => {
     ['', '798 Maharlika Highway, Dampol 2nd A', '', '', '', '', ''],
     ['', 'Pulilan Bulacan, 3005', '', '', '', '', ''],
     ['', 'TIN #007-932-128-000', '', '', '', '', ''],
-    ['', 'Business Style: 007-932-128-000', '', '', '', '', ''],
+    ['', 'Business Style: Premium Feeds Corp.', '', '', '', '', ''],
     ['', '', '', '', '', '', ''], // Blank row
 
     // Billing Information
@@ -479,7 +478,7 @@ const printStatement = async () => {
 798 Maharlika Highway, Dampol 2nd A
 Pulilan Bulacan, 3005
 TIN #007-932-128-000
-Business Style: 007-932-128-000`.replace(/\n/g, '<br>')
+Business Style: Premium Feeds Corp.`.replace(/\n/g, '<br>')
 
   const companyInfo = `MTM ENTERPRISE
 0324 P. Damaso St. Virgen Delas Flores Baliuag Bulacan
@@ -559,7 +558,6 @@ ${billToInfo}
 <div class="billing-info-print">
 <strong>Billing Number:</strong> ${billingNumber.value}<br>
 <strong>Period Covered:</strong> ${formatPeriod()}<br>
-<strong>Date Generated:</strong> ${formatDate(new Date())}<br>
 <strong>Date Submitted:</strong> ${submittedDate}
 </div>
 
@@ -623,6 +621,8 @@ const filterTripsByDate = async () => {
   if (!validateDates()) {
     // Clear the table if dates are invalid
     filteredTrips.value = []
+    // Also clear billing number when dates are invalid
+    billingNumber.value = ''
     return
   }
 
@@ -633,10 +633,13 @@ const filterTripsByDate = async () => {
     // Since we're now fetching filtered data from server, just show all loaded trips
     filteredTrips.value = [...trips.value]
 
-    console.log(`Loaded ${filteredTrips.value.length} trips within date range`)
+    // Generate billing number when data is successfully loaded
+    await generateBillingNumber()
+
   } catch (error) {
     console.error('Error loading billing data:', error)
     filteredTrips.value = []
+    billingNumber.value = '' // Clear billing number on error
   } finally {
     isLoading.value = false
   }
@@ -704,7 +707,6 @@ const generateBillingNumber = async () => {
     // Combine all parts
     billingNumber.value = `${currentYear}-${startFormatted}-${endFormatted}-${randomChars}`
 
-    console.log('Generated billing number:', billingNumber.value)
   } catch (error) {
     console.error('Error generating billing number:', error)
     // Fallback format
@@ -768,7 +770,6 @@ const saveBilling = async () => {
     const response = await axios.post(`${API_BASE_URL}/billings`, billingData)
 
     if (response.status === 201) {
-      console.log('Billing saved to database:', billingData.billingNumber)
       alert(`Billing ${billingNumber.value} saved successfully!\n\nSaved to database with ID: ${response.data.id}\n\nCurrent status: Pending Payment`)
 
       // Generate new billing number for next use

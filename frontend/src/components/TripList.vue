@@ -309,9 +309,7 @@ const { triggerRefresh, onRefresh } = useDataRefresh()
 
 // 📡 Listen for external trip operations (create/update from TripForm)
 onRefresh('trips', async () => {
-  console.log('🔄 TripList: External trip modification detected - refreshing...')
   await fetchData()
-  console.log('✅ TripList: Refreshed due to external changes')
 })
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -367,7 +365,6 @@ onMounted(() => {
 })
 
 const fetchData = async (forceRefresh = false) => {
-  console.log(`🔄 TripList: Fetching trip data... ${forceRefresh ? '(forced refresh)' : ''}`)
   loading.value = true
   try {
     // Add cache-busting parameter for forced refresh
@@ -386,7 +383,6 @@ const fetchData = async (forceRefresh = false) => {
 
     // Force reactivity update by creating new arrays
     trips.value = [...tripsResponse.data.trips]
-    console.log(`✅ TripList: Loaded ${trips.value.length} trips${searchQuery.value ? ` (search: "${searchQuery.value}")` : ''}`)
 
     // Update pagination metadata (only when not searching)
     if (!searchQuery.value) {
@@ -399,7 +395,6 @@ const fetchData = async (forceRefresh = false) => {
     }
 
     employees.value = [...employeesResponse.data]
-    console.log(`✅ TripList: Loaded ${employees.value.length} employees`)
   } catch (error) {
     console.error('❌ TripList: Error fetching data:', error)
   } finally {
@@ -536,9 +531,7 @@ const editTrip = (trip) => {
 const deleteTrip = async (tripId) => {
     if (confirm('Are you sure you want to delete this trip?')) {
       try {
-        console.log('🗑️ Deleting trip:', tripId)
         await axios.delete(`${API_BASE_URL}/trips/${tripId}`)
-        console.log('✅ Trip deleted successfully')
 
         // Clear selected trip if it was deleted
         if (selectedTrip.value && selectedTrip.value.id === tripId) {
@@ -557,7 +550,6 @@ const deleteTrip = async (tripId) => {
 }
 
 const resetToPage1 = () => {
-  console.log('🔄 TripList: Resetting to page 1')
   currentPage.value = 1
 }
 

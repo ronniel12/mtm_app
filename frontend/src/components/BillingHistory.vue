@@ -360,7 +360,6 @@ const fetchBillings = async (page = 1) => {
         currentPage.value = 1
       }
       filteredBillings.value = [...billings.value]
-      console.log('Loaded billings from server:', billings.value.length, 'of', totalBillings.value)
       return
     }
 
@@ -376,7 +375,6 @@ const fetchBillings = async (page = 1) => {
         totalBillings.value = billings.value.length
         totalPages.value = 1
         currentPage.value = 1
-        console.log('Loaded billings from localStorage:', billings.value.length)
         return
       }
     } catch (localError) {
@@ -471,7 +469,6 @@ const togglePaymentStatus = async (billing) => {
       // Update local data
       billing.paymentStatus = newStatus
 
-      console.log('Updated billing status:', billing.id, newStatus)
       alert(`Billing ${billing.billingNumber} marked as ${newStatus === 'paid' ? 'Paid' : 'Pending'}`)
       return
     }
@@ -486,7 +483,6 @@ const togglePaymentStatus = async (billing) => {
     const savedBillings = JSON.stringify(billings.value)
     localStorage.setItem('billingHistory', savedBillings)
 
-    console.log('Updated billing status locally:', billing.id, newStatus)
     alert(`Billing ${billing.billingNumber} marked as ${newStatus === 'paid' ? 'Paid' : 'Pending'} (stored locally)`)
 
   } catch (localError) {
@@ -516,7 +512,6 @@ const deleteBilling = async (billing) => {
         filterBillings()
       }
 
-      console.log('Deleted billing:', billing.id)
       alert(`Billing "${billing.billingNumber}" has been deleted successfully.`)
       return
     }
@@ -535,7 +530,6 @@ const deleteBilling = async (billing) => {
       const savedBillings = JSON.stringify(billings.value)
       localStorage.setItem('billingHistory', savedBillings)
 
-      console.log('Deleted billing locally:', billing.id)
       alert(`Billing "${billing.billingNumber}" has been deleted successfully (local storage only).`)
     }
 
@@ -568,7 +562,7 @@ const exportBilling = (billing) => {
 798 Maharlika Highway, Dampol 2nd A
 Pulilan Bulacan, 3005
 TIN #007-932-128-000
-Business Style: 007-932-128-000`.replace(/\n/g, '<br>')
+Business Style: Premium Feeds Corp.`.replace(/\n/g, '<br>')
 
   const companyInfo = `MTM ENTERPRISE
 0324 P. Damaso St. Virgen Delas Flores Baliuag Bulacan
@@ -639,7 +633,6 @@ ${billToInfo}
 <div class="billing-info-print">
 <strong>Billing Number:</strong> ${billing.billingNumber}<br>
 <strong>Period Covered:</strong> ${billing.period.periodText}<br>
-<strong>Date Generated:</strong> ${formatDate(billing.createdDate)}<br>
 <strong>Date Submitted:</strong> ${submittedDate}
 </div>
 
@@ -702,9 +695,7 @@ ${generateBillingPage('PREMIUM COPY')}
 
 // 📡 Listen for billing creation/deletion events to refresh the list
 onRefresh('billings', async () => {
-  console.log('🔄 Billing refresh triggered - reloading billings...')
   await fetchBillings()
-  console.log('✅ Billing history refreshed')
 })
 
 // Lifecycle
