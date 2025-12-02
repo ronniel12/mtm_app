@@ -20,7 +20,9 @@ const app = express();
 app.use(cors()); // CORS middleware
 app.set('trust proxy', 1); // Trust proxy for Vercel deployment
 
-// Body parsing will be handled by individual routes or Vercel's built-in parser
+// Body parsing middleware for Vercel serverless functions
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Configure multer for memory storage (for BLOB storage)
 const storage = multer.memoryStorage();
