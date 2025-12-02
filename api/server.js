@@ -48,9 +48,7 @@ const upload = multer({
     // All routes defined inline to create ONE serverless function for all API endpoints
     // ============================================================================
 
-    const { query } = require('./lib/db');
-    const PDFService = require('./pdf-service');
-
+    // `query` and `PDFService` already imported at top of file
     // Load all routes from consolidated router files and define them inline
     // This avoids separate router files that Vercel treats as individual functions
 
@@ -139,6 +137,33 @@ const upload = multer({
           error: 'Failed to fetch employee payslips',
           message: error.message
         });
+      }
+    });
+
+    // ============================================================================
+    // ESSENTIAL CRUD ROUTES (For Dashboard/Admin Functionality)
+    // ============================================================================
+
+    // Get all employees
+    app.get('/api/employees', async (req, res) => {
+      try {
+        const result = await query('SELECT * FROM employees ORDER BY name ASC');
+        res.json(result.rows);
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+        res.status(500).json({ error: 'Failed to fetch employees' });
+      }
+    });
+
+    // Trip calculation endpoint
+    app.get('/api/trips/calculated', async (req, res) => {
+      try {
+        const limit = req.query.limit;
+        // For now, just return empty array - can be implemented properly later
+        res.json({ trips: [], total: 0, limit: limit });
+      } catch (error) {
+        console.error('Error fetching calculated trips:', error);
+        res.status(500).json({ error: 'Failed to fetch calculated trips' });
       }
     });
 
