@@ -360,6 +360,7 @@ const fetchBillings = async (page = 1) => {
         currentPage.value = 1
       }
       filteredBillings.value = [...billings.value]
+      console.log('Loaded billings from server:', billings.value.length, 'of', totalBillings.value)
       return
     }
 
@@ -375,6 +376,7 @@ const fetchBillings = async (page = 1) => {
         totalBillings.value = billings.value.length
         totalPages.value = 1
         currentPage.value = 1
+        console.log('Loaded billings from localStorage:', billings.value.length)
         return
       }
     } catch (localError) {
@@ -469,6 +471,7 @@ const togglePaymentStatus = async (billing) => {
       // Update local data
       billing.paymentStatus = newStatus
 
+      console.log('Updated billing status:', billing.id, newStatus)
       alert(`Billing ${billing.billingNumber} marked as ${newStatus === 'paid' ? 'Paid' : 'Pending'}`)
       return
     }
@@ -483,6 +486,7 @@ const togglePaymentStatus = async (billing) => {
     const savedBillings = JSON.stringify(billings.value)
     localStorage.setItem('billingHistory', savedBillings)
 
+    console.log('Updated billing status locally:', billing.id, newStatus)
     alert(`Billing ${billing.billingNumber} marked as ${newStatus === 'paid' ? 'Paid' : 'Pending'} (stored locally)`)
 
   } catch (localError) {
@@ -512,6 +516,7 @@ const deleteBilling = async (billing) => {
         filterBillings()
       }
 
+      console.log('Deleted billing:', billing.id)
       alert(`Billing "${billing.billingNumber}" has been deleted successfully.`)
       return
     }
@@ -530,6 +535,7 @@ const deleteBilling = async (billing) => {
       const savedBillings = JSON.stringify(billings.value)
       localStorage.setItem('billingHistory', savedBillings)
 
+      console.log('Deleted billing locally:', billing.id)
       alert(`Billing "${billing.billingNumber}" has been deleted successfully (local storage only).`)
     }
 
@@ -695,7 +701,9 @@ ${generateBillingPage('PREMIUM COPY')}
 
 // 📡 Listen for billing creation/deletion events to refresh the list
 onRefresh('billings', async () => {
+  console.log('🔄 Billing refresh triggered - reloading billings...')
   await fetchBillings()
+  console.log('✅ Billing history refreshed')
 })
 
 // Lifecycle

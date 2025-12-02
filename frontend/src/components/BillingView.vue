@@ -621,8 +621,6 @@ const filterTripsByDate = async () => {
   if (!validateDates()) {
     // Clear the table if dates are invalid
     filteredTrips.value = []
-    // Also clear billing number when dates are invalid
-    billingNumber.value = ''
     return
   }
 
@@ -633,13 +631,10 @@ const filterTripsByDate = async () => {
     // Since we're now fetching filtered data from server, just show all loaded trips
     filteredTrips.value = [...trips.value]
 
-    // Generate billing number when data is successfully loaded
-    await generateBillingNumber()
-
+    console.log(`Loaded ${filteredTrips.value.length} trips within date range`)
   } catch (error) {
     console.error('Error loading billing data:', error)
     filteredTrips.value = []
-    billingNumber.value = '' // Clear billing number on error
   } finally {
     isLoading.value = false
   }
@@ -707,6 +702,7 @@ const generateBillingNumber = async () => {
     // Combine all parts
     billingNumber.value = `${currentYear}-${startFormatted}-${endFormatted}-${randomChars}`
 
+    console.log('Generated billing number:', billingNumber.value)
   } catch (error) {
     console.error('Error generating billing number:', error)
     // Fallback format
@@ -770,6 +766,7 @@ const saveBilling = async () => {
     const response = await axios.post(`${API_BASE_URL}/billings`, billingData)
 
     if (response.status === 201) {
+      console.log('Billing saved to database:', billingData.billingNumber)
       alert(`Billing ${billingNumber.value} saved successfully!\n\nSaved to database with ID: ${response.data.id}\n\nCurrent status: Pending Payment`)
 
       // Generate new billing number for next use

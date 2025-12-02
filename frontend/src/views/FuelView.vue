@@ -447,44 +447,81 @@ const canImport = computed(() => {
 
 // Debug handlers
 const onFormSubmit = (event) => {
+  console.log('🧲 FORM SUBMIT EVENT TRIGGERED')
+  console.log('🧲 Event object:', event)
+  console.log('🧲 Current formData:', JSON.stringify(formData.value, null, 2))
+  console.log('🧲 Form validity check:', {
+    hasDate: !!formData.value.date,
+    liters: formData.value.liters,
+    litersValid: formData.value.liters > 0,
+    priceValid: formData.value.pricePerLiter > 0,
+    isFormValid: isFormValid.value
+  })
 
   if (!isFormValid.value) {
+    console.log('❌ FORM INVALID - preventing submission')
     event.preventDefault()
     alert('Please fill all required fields correctly.')
     return false
   }
 
+  console.log('✅ FORM VALID - attempting save...')
   saveEntry()
 }
 
 const onCancelClick = () => {
+  console.log('🟢 CANCEL button clicked')
   closeModal()
 }
 
 const onSubmitClick = () => {
+  console.log('🟣 ADD ENTRY button clicked')
+  console.log('🟣 Current formData:', JSON.stringify(formData.value, null, 2))
 
   if (!isFormValid.value) {
+    console.log('❌ FORM INVALID - button should be disabled!')
     alert('Please fill all required fields: Date, Liters, and Price/Liter.')
     return
   }
 
+  console.log('✅ FORM VALID - calling saveEntry...')
   saveEntry()
 }
 
 // Methods
 const fetchFuelData = async () => {
+  console.log('🔄 fetchFuelData called, setting loading to true')
   loading.value = true
   try {
+    console.log('📡 Making GET request to /api/fuel')
     const response = await axios.get('/api/fuel')
+    console.log('📥 API Response received:', response)
+    console.log('📥 Response data type:', typeof response.data)
+    console.log('📥 Response data:', JSON.stringify(response.data, null, 2))
 
     // API returns { fuel: [...], pagination: {...} }
     fuelData.value = response.data.fuel || []
+    console.log('✅ fuelData.value updated to:', JSON.stringify(fuelData.value, null, 2))
+    console.log('✅ Number of fuel entries loaded:', fuelData.value.length)
 
     // Check if data has expected structure
     if (fuelData.value.length > 0) {
-      // Data validation passed
+      console.log('🔍 First fuel entry structure:', JSON.stringify(fuelData.value[0], null, 2))
+
+      // Check for required fields
+      const firstEntry = fuelData.value[0]
+      console.log('📊 Entry has required fields:', {
+        id: !!firstEntry.id,
+        date: !!firstEntry.date,
+        liters: !!firstEntry.liters,
+        pricePerLiter: !!firstEntry.pricePerLiter,
+        amount: !!firstEntry.amount,
+        validLiters: !isNaN(parseFloat(firstEntry.liters)),
+        validAmount: !isNaN(parseFloat(firstEntry.amount))
+      })
     }
 
+    console.log('🎯 fetchFuelData completed successfully')
 
   } catch (error) {
     console.error('❌ Error fetching fuel data:', error)
@@ -492,11 +529,13 @@ const fetchFuelData = async () => {
     console.error('❌ Error status:', error.response?.status)
     console.error('❌ Error headers:', error.response?.headers)
   } finally {
+    console.log('⏳ Setting loading to false')
     loading.value = false
   }
 }
 
 const saveEntry = async () => {
+  console.log('🚀 saveEntry called with formData:', JSON.stringify(formData.value, null, 2))
 
   try {
     const requestData = {
@@ -511,17 +550,25 @@ const saveEntry = async () => {
       status: formData.value.status || 'completed'
     }
 
+    console.log('📤 Making API request to:', editingEntry.value ? `/api/fuel/${editingEntry.value.id}` : '/api/fuel')
+    console.log('📤 Request data:', JSON.stringify(requestData, null, 2))
 
     if (editingEntry.value) {
       await axios.put(`/api/fuel/${editingEntry.value.id}`, requestData)
+      console.log('✅ PUT request successful')
     } else {
       const response = await axios.post('/api/fuel', requestData)
+      console.log('✅ POST request successful, response:', response.data)
     }
 
+    console.log('🔄 Fetching updated data...')
     await fetchFuelData()
+    console.log('✅ Data refreshed')
 
+    console.log('🔒 Closing modal...')
     closeModal()
 
+    console.log('🎉 Entry save completed successfully!')
   } catch (error) {
     console.error('❌ Error saving entry:', error)
     console.error('❌ Error details:', error.response?.data || error.message)
@@ -707,6 +754,8 @@ const extractColumnsAndPreview = async (file) => {
     // Set default preview (first few rows)
     updatePreview()
 
+    console.log('📊 File loaded successfully')
+    console.log('📊 Total rows in file:', rawSheetData.value.length)
 
   } catch (error) {
     console.error('Error reading file:', error)
@@ -811,6 +860,11 @@ const parseCSV = (text) => {
     result.push(cleanedFields)
   }
 
+  console.log('🔍 CSV PARSE RESULT:')
+  result.forEach((row, idx) => {
+    console.log(`Row ${idx}:`, row.map((cell, i) => `Col${i+1}:${cell}`).join(' | '))
+  })
+
   return result
 }
 
@@ -875,6 +929,9 @@ const updatePreview = () => {
     return
   }
 
+  console.log('📊 updatePreview called')
+  console.log('📊 Range:', dataRange.value)
+  console.log('📊 Field mapping:', JSON.stringify(fieldMapping.value, null, 2))
 
   try {
     const startRow = dataRange.value.startRow - 1 // Convert to 0-based index
@@ -882,10 +939,14 @@ const updatePreview = () => {
 
     // Extract data from the selected rows
     const selectedRows = rawSheetData.value.slice(startRow, endRow + 1)
+    console.log(`📊 Selected ${selectedRows.length} rows (${startRow} to ${endRow})`)
 
     const mappedData = []
     const errors = []
 
+      console.log('🔍 STARTING ROW MAPPING PROCESS - VERIFICATION MODE')
+      console.log(`🔍 CSV has ${rawSheetData.value[0]?.length || 0} columns`)
+      console.log('🔍 Column mappings specified by user:', JSON.stringify(fieldMapping.value, null, 2))
 
       // FIRST, validate ALL column mappings are valid for this CSV
       const csvColumnCount = rawSheetData.value[0]?.length || 0
@@ -910,6 +971,8 @@ const updatePreview = () => {
         const rowIndex = startRow + i + 1 // For display (1-based)
         const row = selectedRows[i]
 
+        console.log(`🔍 Processing row ${rowIndex} - CSV row ${rowIndex}:`)
+        console.log(`🔍 Raw Excel row:`, row.map((cell, idx) => `Col${idx+1}:${cell}`).join(' | ') || 'NO ROW DATA')
 
         // DIRECT COLUMN MAPPING - CRITICAL: FuelField = Excel[ColumnNumber - 1]
         const mappedEntry = {}
@@ -924,7 +987,9 @@ const updatePreview = () => {
           const value = row[excelColIdx]
           mappedEntry.date = value || ''
           fieldMappingsApplied.push(`DATE (ExcelCol${fieldMapping.value.date.column}=Row[${excelColIdx}]):"${value}"`)
+          console.log(`✅ DATE: ExcelCol${fieldMapping.value.date.column} → "${value}"`)
         } else {
+          console.log(`🚫 DATE: NOT MAPPED (empty field)`)
         }
 
         // LITERS field mapping
@@ -934,7 +999,9 @@ const updatePreview = () => {
           const numValue = parseFloat(rawValue)
           mappedEntry.liters = isNaN(numValue) ? 0 : numValue
           fieldMappingsApplied.push(`LITERS (ExcelCol${fieldMapping.value.liters.column}=Row[${excelColIdx}]):"${rawValue}"→${mappedEntry.liters}`)
+          console.log(`✅ LITERS: ExcelCol${fieldMapping.value.liters.column} → "${rawValue}" → ${mappedEntry.liters}`)
         } else {
+          console.log(`🚫 LITERS: NOT MAPPED`)
         }
 
         // PRICE/PER LITER field mapping
@@ -944,7 +1011,9 @@ const updatePreview = () => {
           const numValue = parseFloat(rawValue)
           mappedEntry.pricePerLiter = isNaN(numValue) ? 0 : numValue
           fieldMappingsApplied.push(`PRICE/LITER (ExcelCol${fieldMapping.value.pricePerLiter.column}=Row[${excelColIdx}]):"${rawValue}"→${mappedEntry.pricePerLiter}`)
+          console.log(`✅ PRICE/LITER: ExcelCol${fieldMapping.value.pricePerLiter.column} → "${rawValue}" → ${mappedEntry.pricePerLiter}`)
         } else {
+          console.log(`🚫 PRICE/LITER: NOT MAPPED`)
         }
 
         // AMOUNT: If mapped, use specified column; if not, auto-calculate
@@ -954,10 +1023,12 @@ const updatePreview = () => {
           const numValue = parseFloat(rawValue)
           mappedEntry.amount = isNaN(numValue) ? 0 : numValue
           fieldMappingsApplied.push(`AMOUNT (ExcelCol${fieldMapping.value.amount.column}=Row[${excelColIdx}]):"${rawValue}"→${mappedEntry.amount}`)
+          console.log(`✅ AMOUNT: ExcelCol${fieldMapping.value.amount.column} → "${rawValue}" → ${mappedEntry.amount}`)
         } else {
           // Auto-calculate amount if not explicitly mapped
           mappedEntry.amount = (parseFloat(mappedEntry.liters) || 0) * (parseFloat(mappedEntry.pricePerLiter) || 0)
           fieldMappingsApplied.push(`AMOUNT: Auto-calculated = ${mappedEntry.liters} × ${mappedEntry.pricePerLiter} = ${mappedEntry.amount}`)
+          console.log(`🔄 AMOUNT: Auto-calculated = ${mappedEntry.liters} × ${mappedEntry.pricePerLiter} = ${mappedEntry.amount}`)
         }
 
         if (fieldMapping.value.plateNumber.column && fieldMapping.value.plateNumber.column > 0) {
@@ -965,7 +1036,9 @@ const updatePreview = () => {
           const value = row[excelColIdx]
           mappedEntry.plateNumber = value || null
           fieldMappingsApplied.push(`PLATE NUMBER (ExcelCol${fieldMapping.value.plateNumber.column}=Row[${excelColIdx}]):"${value}"`)
+          console.log(`✅ PLATE NUMBER: ExcelCol${fieldMapping.value.plateNumber.column} → "${value}"`)
         } else {
+          console.log(`🚫 PLATE NUMBER: NOT MAPPED`)
         }
 
         if (fieldMapping.value.poNumber.column && fieldMapping.value.poNumber.column > 0) {
@@ -973,7 +1046,9 @@ const updatePreview = () => {
           const value = row[excelColIdx]
           mappedEntry.poNumber = value || null
           fieldMappingsApplied.push(`P.O. NUMBER (ExcelCol${fieldMapping.value.poNumber.column}=Row[${excelColIdx}]):"${value}"`)
+          console.log(`✅ P.O. NUMBER: ExcelCol${fieldMapping.value.poNumber.column} → "${value}"`)
         } else {
+          console.log(`🚫 P.O. NUMBER: NOT MAPPED`)
         }
 
         if (fieldMapping.value.product.column && fieldMapping.value.product.column > 0) {
@@ -981,7 +1056,9 @@ const updatePreview = () => {
           const value = row[excelColIdx]
           mappedEntry.product = value || null
           fieldMappingsApplied.push(`PRODUCT (ExcelCol${fieldMapping.value.product.column}=Row[${excelColIdx}]):"${value}"`)
+          console.log(`✅ PRODUCT: ExcelCol${fieldMapping.value.product.column} → "${value}"`)
         } else {
+          console.log(`🚫 PRODUCT: NOT MAPPED`)
         }
 
         if (fieldMapping.value.gasStation.column && fieldMapping.value.gasStation.column > 0) {
@@ -989,9 +1066,14 @@ const updatePreview = () => {
           const value = row[excelColIdx]
           mappedEntry.gasStation = value || null
           fieldMappingsApplied.push(`GAS STATION (ExcelCol${fieldMapping.value.gasStation.column}=Row[${excelColIdx}]):"${value}"`)
+          console.log(`✅ GAS STATION: ExcelCol${fieldMapping.value.gasStation.column} → "${value}"`)
         } else {
+          console.log(`🚫 GAS STATION: NOT MAPPED`)
         }
 
+        console.log(`🎯 Row ${rowIndex} SUMMARY - Field Mappings:`)
+        fieldMappingsApplied.forEach(mapping => console.log(`  └─ ${mapping}`))
+        console.log(`🏆 Row ${rowIndex} FINAL FUEL ENTRY:`, JSON.stringify(mappedEntry, null, 2))
 
       // Validate required fields
       if (fieldMapping.value.date.column > 0 && !mappedEntry.date) {
@@ -1018,6 +1100,13 @@ const updatePreview = () => {
     previewData.value = mappedData.slice(0, 100) // Show all data for verification
     previewErrors.value = errors.slice(0, 10) // Limit error display
 
+    console.log('✅ Preview updated:', {
+      totalRows: selectedRows.length,
+      validRows: mappedData.length,
+      previewRows: previewData.value.length,
+      errors: errors.length
+    })
+
   } catch (error) {
     console.error('❌ Error updating preview:', error)
     previewData.value = []
@@ -1032,6 +1121,9 @@ const importDataRange = async () => {
   }
 
   try {
+    console.log('🚀 Starting bulk import...')
+    console.log('🚀 Data range:', dataRange.value)
+    console.log('🚀 Field mapping:', JSON.stringify(fieldMapping.value, null, 2))
 
     if (confirm(`Import ${previewData.value.length} fuel entries using fast bulk import?`)) {
       loading.value = true
@@ -1055,6 +1147,7 @@ const importDataRange = async () => {
         }
       })
 
+      console.log(`📤 Sending ${entries.length} entries to bulk endpoint...`)
 
       try {
         // Use BULK IMPORT endpoint for fast multi-entry import
@@ -1062,6 +1155,7 @@ const importDataRange = async () => {
           entries: entries
         })
 
+        console.log('📥 Bulk import response:', response.data)
 
         const { message, inserted, failed, errors, insertedIds } = response.data
 
@@ -1075,6 +1169,7 @@ const importDataRange = async () => {
         }
 
         if (inserted > 0) {
+          console.log('🎉 Bulk import completed successfully:', { inserted, failed, insertedIds: insertedIds?.length })
           fetchFuelData()
         }
 
@@ -1082,6 +1177,7 @@ const importDataRange = async () => {
         console.error('❌ Bulk import failed:', bulkError)
 
         // Fallback: Try individual imports if bulk fails (for compatibility)
+        console.log('🔄 Falling back to individual imports...')
         alert('Bulk import failed. Falling back to individual imports...')
 
         let imported = 0
@@ -1090,6 +1186,7 @@ const importDataRange = async () => {
         // Process one by one as fallback
         for (const entry of entries) {
           try {
+            console.log('📤 Importing entry individually:', entry)
             await axios.post('/api/fuel', entry)
             imported++
           } catch (individualError) {

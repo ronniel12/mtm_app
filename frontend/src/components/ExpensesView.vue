@@ -111,7 +111,7 @@
               </span>
             </td>
             <td>{{ expense.description }}</td>
-            <td>{{ expense.vehicle || ' ' }}</td>
+            <td>{{ expense.vehicle || 'N/A' }}</td>
             <td class="amount-cell">{{ formatCurrency(expense.amount) }}</td>
             <td>
               <div v-if="expense.receipt_filename" class="attachment-cell">
@@ -156,7 +156,7 @@
 
           <div class="card-row">
             <strong>Vehicle:</strong>
-            <span>{{ expense.vehicle || ' ' }}</span>
+            <span>{{ expense.vehicle || 'N/A' }}</span>
           </div>
 
           <div class="card-row">
@@ -339,7 +339,9 @@ const { triggerRefresh, onRefresh } = useDataRefresh()
 
 // 📡 Listen for external expense operations (create/update/delete from this or other components)
 onRefresh('expenses', async () => {
+  console.log('🔄 ExpensesView: External expense modification detected - refreshing...')
   await fetchExpenses()
+  console.log('✅ ExpensesView: Refreshed due to external changes')
 })
 
 // Reactive data
@@ -566,12 +568,19 @@ const foodAllowanceTotal = computed(() => {
 // Methods
 const fetchExpenses = async () => {
   try {
+    console.log('🖥️ FRONTEND: Starting fetchExpenses...')
     const response = await axios.get(`${API_BASE_URL}/expenses`)
+    console.log('🖥️ FRONTEND: API response status:', response.status)
+    console.log('🖥️ FRONTEND: API response data length:', (response.data || []).length)
+    console.log('🖥️ FRONTEND: API response first few items:', (response.data || []).slice(0, 3))
 
     expenses.value = response.data || []
+    console.log('🖥️ FRONTEND: Set expenses.value to', expenses.value.length, 'items')
+    console.log('🖥️ FRONTEND: Current filteredExpenses computed:', filteredExpenses.value.length, 'items')
   } catch (error) {
     console.error('Error fetching expenses:', error)
     // For demo purposes, use mock data if API fails
+    console.log('🖥️ FRONTEND: API ERROR - using mock data')
     expenses.value = [
       {
         id: 1,
@@ -702,20 +711,25 @@ const isValidFormValue = (value) => {
 
 const saveExpense = async () => {
   try {
+    console.log('🔧 saveExpense() called - editingExpense:', !!editingExpense.value)
 
     if (editingExpense.value) {
+      console.log('📝 EDITING existing expense:', editingExpense.value.id)
 
       // Update existing expense (without file support for now)
       const expenseData = { ...expenseForm.value }
 
+      console.log('📊 Original expenseData:', expenseData)
 
       // Clean up expense data for PUT request
       Object.keys(expenseData).forEach(key => {
         if (!isValidFormValue(expenseData[key])) {
+          console.log(`❌ Removing invalid field '${key}':`, expenseData[key])
           delete expenseData[key]
         }
       })
 
+      console.log('✅ Cleaned expenseData for PUT:', expenseData)
 
       const response = await axios.put(`${API_BASE_URL}/expenses/${editingExpense.value.id}`, expenseData)
       const index = expenses.value.findIndex(e => e.id === editingExpense.value.id)
@@ -724,14 +738,25 @@ const saveExpense = async () => {
         expenses.value[index] = response.data
       }
     } else {
+      console.log('➕ CREATING new expense')
 
+      console.log('📋 expenseForm.value:', expenseForm.value)
+      console.log('📎 selectedFile.value:', selectedFile.value)
+      console.log('📄 selectedFile.value exists:', !!selectedFile.value)
 
-    if (selectedFile.value) {
+      if (selectedFile.value) {
+        console.log('📚 Converting file to base64 for upload')
+        console.log('📎 File details:', {
+          name: selectedFile.value.name,
+          size: selectedFile.value.size,
+          type: selectedFile.value.type
+        })
 
         // IMPORTANT: Capture BOTH form data and file reference OUTSIDE the async callback to avoid Vue reactivity issues
         const formDataSnapshot = { ...expenseForm.value }
         const fileToUpload = selectedFile.value
 
+        console.log('📋 Captured form data before file processing:', formDataSnapshot)
 
         try {
           // Convert file to base64 and send as JSON (Vercel-compatible approach)
@@ -739,17 +764,22 @@ const saveExpense = async () => {
 
           reader.onload = async () => {
             try {
+              console.log('📖 FileReader onload triggered')
+              console.log('📖 reader.result sample:', reader.result?.substring(0, 50), '...')
 
               // Extract base64 data (remove 'data:image/jpeg;base64,' prefix)
               const base64Data = reader.result.split(',')[1]
+              console.log('📎 Base64 data extracted, length:', base64Data.length)
 
               // Use the captured form data snapshot, not the live reactive ref
               const expenseData = { ...formDataSnapshot }
+              console.log('📋 Using captured form data in base64 processing:', expenseData)
 
               // Clean up expense data
               Object.keys(expenseData).forEach(key => {
                 const value = expenseData[key]
                 if (!isValidFormValue(value)) {
+                  console.log(`🗑️ Removing invalid field '${key}':`, value)
                   delete expenseData[key]
                 }
               })
@@ -762,9 +792,15 @@ const saveExpense = async () => {
                 size: fileToUpload.size
               }
 
+              console.log('📎 Base64 file created:', expenseData.receiptFile.filename, 'size:', expenseData.receiptFile.size)
+              console.log('📤 Sending JSON request with base64 file...')
+              console.log('📊 expenseData keys:', Object.keys(expenseData))
+              console.log('📊 receiptFile object:', expenseData.receiptFile)
 
               const response = await axios.post(`${API_BASE_URL}/expenses`, expenseData)
 
+              console.log('✅ Base64 file upload response:', response.status, response.statusText)
+              console.log('📄 Response data contains receipt fields:', !!response.data.receipt_filename)
 
               expenses.value.push(response.data)
               triggerRefresh('expenses')
@@ -788,13 +824,16 @@ const saveExpense = async () => {
           }
 
           // Start reading the file
+          console.log('▶️ Starting FileReader.readAsDataURL...')
           reader.readAsDataURL(fileToUpload)
+          console.log('▶️ FileReader.readAsDataURL() called successfully')
 
         } catch (error) {
           console.error('❌ Error setting up FileReader:', error)
           alert('Error setting up file reader. Please try again.')
         }
       } else {
+        console.log('📄 Sending JSON request (no files)')
 
         // Create expense data for JSON request (no file attachment)
         const expenseData = { ...expenseForm.value }
@@ -803,12 +842,15 @@ const saveExpense = async () => {
         Object.keys(expenseData).forEach(key => {
           const value = expenseData[key]
           if (!isValidFormValue(value)) {
+            console.log(`🗑️ Removing invalid field '${key}':`, value)
             delete expenseData[key]
           }
         })
 
+        console.log('🧹 Cleaned expenseData (no file):', expenseData)
 
         const response = await axios.post(`${API_BASE_URL}/expenses`, expenseData)
+        console.log('✅ JSON response:', response.status, response.statusText)
 
         expenses.value.push(response.data)
         triggerRefresh('expenses')

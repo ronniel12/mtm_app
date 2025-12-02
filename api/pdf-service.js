@@ -17,6 +17,7 @@ class PDFService {
     const isVercel = isVercelServerless();
 
     if (isVercel) {
+      console.log('🌐 Running in Vercel serverless environment');
       return {
         executablePath: await chromium.executablePath(),
         args: [
@@ -29,6 +30,7 @@ class PDFService {
         headless: true
       };
     } else {
+      console.log('💻 Running locally');
       return {
         headless: true,
         args: [
@@ -47,6 +49,7 @@ class PDFService {
   static async generatePayslipPDF(payslipData) {
     let browser = null;
     try {
+      console.log('📄 Starting PDF generation for payslip:', payslipData.payslipNumber);
 
       // Get browser configuration based on environment
       const browserConfig = await this.getBrowserConfig();
@@ -75,6 +78,7 @@ class PDFService {
       });
 
       await browser.close();
+      console.log('✅ PDF generated successfully, size:', pdfBuffer.length, 'bytes');
       return pdfBuffer;
 
     } catch (error) {
@@ -92,6 +96,7 @@ class PDFService {
 
   static async uploadToBlob(pdfBuffer, payslipNumber) {
     try {
+      console.log('☁️ Starting blob upload for payslip:', payslipNumber);
 
       // Create organized folder structure within existing payslips folder
       const now = new Date();
@@ -105,6 +110,7 @@ class PDFService {
         access: 'public'
       });
 
+      console.log('✅ Successfully uploaded to blob:', blob.url);
       return {
         url: blob.url,
         filename: filename,
@@ -145,6 +151,7 @@ class PDFService {
   static async generateBillingPDF(billingData) {
     let browser = null;
     try {
+      console.log('📄 Starting PDF generation for billing:', billingData.billingNumber);
 
       // Get browser configuration based on environment
       const browserConfig = await this.getBrowserConfig();
@@ -173,6 +180,7 @@ class PDFService {
       });
 
       await browser.close();
+      console.log('✅ Billing PDF generated successfully, size:', pdfBuffer.length, 'bytes');
       return pdfBuffer;
 
     } catch (error) {
@@ -190,6 +198,7 @@ class PDFService {
 
   static async uploadBillingToBlob(pdfBuffer, billingNumber) {
     try {
+      console.log('☁️ Starting blob upload for billing:', billingNumber);
 
       // Create organized folder structure within existing billings folder
       const now = new Date();
@@ -203,6 +212,7 @@ class PDFService {
         access: 'public'
       });
 
+      console.log('✅ Successfully uploaded billing to blob:', blob.url);
       return {
         url: blob.url,
         filename: filename,

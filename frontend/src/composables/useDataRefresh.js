@@ -24,6 +24,7 @@ export function useDataRefresh() {
       ...data
     }
 
+    console.log(`🔄 Refresh triggered for: ${dataType}`, eventData)
 
     // Dispatch to all listening components
     window.dispatchEvent(new CustomEvent(`refresh-${dataType}`, {
@@ -39,18 +40,21 @@ export function useDataRefresh() {
    */
   const onRefresh = (dataType, callback) => {
     const eventHandler = (event) => {
+      console.log(`📡 Refresh event received for: ${dataType}`, event.detail)
       callback(event.detail)
     }
 
     // Store cleanup function for this listener
     const cleanup = () => {
       window.removeEventListener(`refresh-${dataType}`, eventHandler)
+      console.log(`🔇 Refresh listener removed for: ${dataType}`)
     }
 
     // Add listener
     window.addEventListener(`refresh-${dataType}`, eventHandler)
     eventBus.set(`${dataType}-${Date.now()}`, cleanup)
 
+    console.log(`🎧 Refresh listener added for: ${dataType}`)
 
     return cleanup
   }
@@ -70,6 +74,7 @@ export function useDataRefresh() {
   const cleanupAll = () => {
     eventBus.forEach(cleanup => cleanup())
     eventBus.clear()
+    console.log('🧹 All refresh listeners cleaned up')
   }
 
   return {

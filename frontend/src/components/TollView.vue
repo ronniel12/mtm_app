@@ -360,13 +360,16 @@ const fetchTrips = async () => {
 // Calculate tolls for all trips using external API
 const calculateTollsForTrips = async () => {
   // First check for duplicates
+  console.log('🔍 Checking for duplicates...');
   checkForDuplicates(trips.value);
+  console.log('📊 Found duplicate groups:', pendingConfirmations.value.length);
 
   // Calculate tolls only for trips that aren't pending confirmation
   const tripsToCalculate = trips.value.filter(trip =>
     !trip.duplicateStatus || trip.duplicateStatus === 'separate'
   );
 
+  console.log('🚀 Calculating tolls for', tripsToCalculate.length, 'trips');
   for (const trip of tripsToCalculate) {
     await calculateTollForTrip(trip);
   }
@@ -425,6 +428,7 @@ const calculateTollForTrip = async (trip) => {
     console.error('Error calculating toll for trip:', trip.id, error)
     // If server is unavailable, stop the entire calculation process and clear selections
     if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || !error.response) {
+      console.log('Server unavailable, stopping calculation process and clearing selections')
       isStopped.value = true
       isPaused.value = false
       serverWasUnavailable.value = true
@@ -489,6 +493,7 @@ const saveComputedToll = async (tripId) => {
     await axios.put(`${API_BASE_URL}/trips/${tripId}`, {
       computedToll: trip._computedToll
     })
+    console.log('Computed toll saved successfully')
   } catch (error) {
     console.error('Error saving computed toll:', error)
   }
@@ -504,6 +509,7 @@ const saveRoundtripToll = async (tripId) => {
       roundtripToll: trip.roundtripToll
     })
     // Show success feedback
+    console.log('Roundtrip toll saved successfully')
   } catch (error) {
     console.error('Error saving roundtrip toll:', error)
     // Could add user notification here
@@ -561,6 +567,7 @@ const saveActualToll = async (tripId) => {
       actualTollExpense: trip.actualTollExpense
     })
     // Show success feedback
+    console.log('Actual toll expense saved successfully')
   } catch (error) {
     console.error('Error saving actual toll expense:', error)
     // Could add user notification here

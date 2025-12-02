@@ -1353,7 +1353,15 @@ const loadDeductionsData = async () => {
 
 const updateDeductionConfig = async (employeeUuid, deductionId, applyMode, employeeName, deductionName, employee, deduction, config) => {
   try {
-
+    // Debug logging to verify the deduction ID matches expectation
+    console.log('🎯 updateDeductionConfig called with:', {
+      employeeUuid,
+      deductionId,
+      applyMode,
+      deductionName,
+      availableDeductionsCount: availableDeductions.value.length,
+      availableDeductionsNames: availableDeductions.value.map(d => `${d.id}:${d.name}`)
+    })
 
     const payload = {
       employee_uuid: employeeUuid,
@@ -1362,6 +1370,7 @@ const updateDeductionConfig = async (employeeUuid, deductionId, applyMode, emplo
     }
 
     await axios.post(`${API_BASE_URL}/employee-deduction-configs`, payload)
+    console.log(`✅ Updated ${employeeName}'s ${deductionName} (ID:${deductionId}) config to ${applyMode}`)
 
     // If selected "selected_dates" mode, automatically open the date picker
     if (applyMode === 'selected_dates') {
@@ -1493,6 +1502,7 @@ const saveDateSelections = async () => {
     }
 
     await axios.post(`${API_BASE_URL}/employee-deduction-configs`, payload)
+    console.log(`Updated ${selectedEmployee.value.name}'s ${selectedDeduction.value.name} dates`)
     closeDateModal()
     await loadDeductionMatrix()
   } catch (error) {
@@ -1593,6 +1603,7 @@ const deleteConfig = async (employeeUuid, deductionId, employeeName, deductionNa
 
   try {
     await axios.delete(`${API_BASE_URL}/employee-deduction-configs/${employeeUuid}/${deductionId}`)
+    console.log(`Deleted ${employeeName}'s ${deductionName} config`)
 
     // Refresh the matrix
     await loadDeductionMatrix()

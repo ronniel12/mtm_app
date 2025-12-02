@@ -277,8 +277,10 @@ const downloadPayslip = async (payslip) => {
 
     // Always use client-side PDF generation for Vercel compatibility
     // (Vercel serverless has browser library issues, so we skip server-side attempts)
+    console.log('📄 Using client-side PDF generation for employee payslip:', payslip.payslipNumber)
 
     // Client-side PDF generation
+    console.log('📄 Starting client-side PDF generation for employee payslip:', payslip.payslipNumber)
 
     // Create temporary modal with payslip data to render PayslipPreview
     tempPayslip.value = {
@@ -313,6 +315,7 @@ const downloadPayslip = async (payslip) => {
     // Generate and open PDF
     await openPDFInNewTab(payslipElement, payslip)
 
+    console.log('✅ Client-side PDF generated and opened successfully')
 
   } catch (error) {
     console.error('Error downloading payslip:', error)

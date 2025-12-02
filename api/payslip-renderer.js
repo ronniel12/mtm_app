@@ -1,5 +1,8 @@
-// Server-side Payslip Rendering Utility for PDF Generation
-// This provides consistent styling and layout for server-side PDF generation
+const fs = require('fs');
+const path = require('path');
+
+// Shared Payslip Rendering Utility
+// This provides consistent styling and layout for both Vue components and PDF generation
 class PayslipRenderer {
 
   // Generate the complete payslip HTML
@@ -19,8 +22,19 @@ class PayslipRenderer {
 
     const cssStyles = this.getStyles(isForPDF);
 
-    // For server-side, remove the public path dependency
-    const logoSrc = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN88+vvfwAJpwPzSxU7nwAAAABJRU5ErkJggg=='; // Transparent placeholder
+    // Read and encode logo for PDF if needed
+    let logoSrc = '/mtmlogo.jpeg';
+    if (isForPDF) {
+      try {
+        const logoPath = path.join(__dirname, '..', 'frontend', 'public', 'mtmlogo.jpeg');
+        const logoBuffer = fs.readFileSync(logoPath);
+        const logoBase64 = logoBuffer.toString('base64');
+        logoSrc = `data:image/jpeg;base64,${logoBase64}`;
+      } catch (error) {
+        console.warn('Failed to load logo for PDF:', error.message);
+        logoSrc = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEA'; // fallback placeholder
+      }
+    }
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -36,7 +50,7 @@ class PayslipRenderer {
     <div class="company-header">
       <div class="company-info-centered">
         <div class="logo-container">
-          <!-- Logo will be added via image processing if needed -->
+          <img src="${logoSrc}" alt="MTM Enterprise Logo" class="company-logo-large" />
         </div>
         <h1 class="company-name-small">MTM ENTERPRISE</h1>
         <div class="company-details-small">

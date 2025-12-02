@@ -701,6 +701,7 @@ const applyEmployeeDeductionConfigurations = async () => {
     const configsResponse = await axios.get(`${API_BASE_URL}/employee-deduction-configs?employee_uuid=${employeeId}`)
     const configs = configsResponse.data
 
+    console.log('Employee deduction configs:', configs)
 
     // Apply only deductions from employee configurations
     const configDeductions = []
@@ -762,8 +763,10 @@ const applyEmployeeDeductionConfigurations = async () => {
     }
 
     deductions.value = configDeductions
+    console.log('Applied deductions:', configDeductions.length, 'configuration-driven deductions')
 
   } catch (error) {
+    console.error('Error applying employee deduction configurations:', error)
     // No fallback to standard deductions - only apply configured deductions
     deductions.value = []
   }
@@ -830,6 +833,7 @@ const updateDeduction = async () => {
       editDeductionForm.value = { id: '', name: '', type: 'percentage', value: 0 }
     }
   } catch (error) {
+    console.error('Error updating deduction:', error)
     alert('Failed to update deduction. Please try again.')
   }
 }
@@ -849,6 +853,7 @@ const deleteDeduction = async (deduction) => {
         alert(`Saved deduction "${deduction.name}" deleted successfully!`)
       }
     } catch (error) {
+      console.error('Error deleting deduction:', error)
       alert('Failed to delete deduction. Please try again.')
     }
   }
@@ -1064,6 +1069,7 @@ const addDeduction = async () => {
       if (existingIndex !== -1) {
         // Update existing entry with real database ID and data
         availableDeductions.value[existingIndex] = savedDeduction;
+        console.log('🔄 Updated deduction ID from custom:', deductionData.id, 'to real:', savedDeduction.id);
       } else {
         // Fallback: just add the new one
         availableDeductions.value.push(savedDeduction);
@@ -1075,6 +1081,7 @@ const addDeduction = async () => {
       clearForm()
     }
   } catch (error) {
+    console.error('Error saving deduction:', error)
     alert('Failed to save deduction. Please try again.')
   }
 }
@@ -1125,7 +1132,13 @@ const filterEmployeeTripData = () => {
   // Auto-apply employee deduction configurations when filters are valid
   applyEmployeeDeductionConfigurations()
 
-
+  // This is called when filters change, computed property will automatically update
+  console.log('Filtering with:', {
+    selectedEmployeeUuid: selectedEmployeeUuid.value,
+    selectedEmployeeName: selectedEmployeeName.value,
+    autoDeductions: deductions.value.length,
+    payslipNumber: payslipNumber.value
+  })
 }
 
 const exportPDF = () => {
@@ -1512,9 +1525,11 @@ const calculateTripRates = (tripsArray, ratesData) => {
 }
 
 const generatePayslipNumber = () => {
+  console.log('generatePayslipNumber called - startDate:', startDate.value, 'endDate:', endDate.value)
 
   // Check if dates exist and are not empty strings
   if (!startDate.value || startDate.value === '' || !endDate.value || endDate.value === '') {
+    console.log('Dates not available, setting P----')
     payslipNumber.value = 'P----'
     return
   }
@@ -1531,9 +1546,12 @@ const generatePayslipNumber = () => {
     const startDateObj = new Date(startDate.value)
     const endDateObj = new Date(endDate.value)
 
+    console.log('Date objects:', startDateObj, endDateObj)
+    console.log('getTime values:', startDateObj.getTime(), endDateObj.getTime())
 
     // Validate dates
     if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      console.log('Invalid date objects, setting P----')
       payslipNumber.value = 'P----'
       return
     }
@@ -1545,7 +1563,9 @@ const generatePayslipNumber = () => {
 
     payslipNumber.value = `P${startMonth}${endDay}-${year}-${timestamp}`
 
+    console.log('Generated payslip number:', payslipNumber.value)
   } catch (error) {
+    console.error('Error generating payslip number:', error)
     payslipNumber.value = 'P----'
   }
 }
@@ -1626,7 +1646,7 @@ const savePayslip = async () => {
       JSON.stringify(obj)
       return obj // Return as-is if serializable
     } catch (error) {
-      // Warning removed during cleanup
+      console.warn('Object not fully serializable:', error.message)
       // Fallback: create a clean copy with only serializable properties
       return {
         id: obj.id,
@@ -1665,6 +1685,7 @@ const savePayslip = async () => {
     const response = await axios.post(`${API_BASE_URL}/payslips`, serializableData)
 
     if (response.status === 201) {
+      console.log('Payslip saved successfully:', payslipData.payslipNumber)
 
       const deductionSummary = deductions.value.length > 0
         ? `\nTotal Deductions: ₱${formatCurrency(totalDeductions.value)}\nNet Pay: ₱${formatCurrency(netPay.value)}`
@@ -1679,6 +1700,8 @@ const savePayslip = async () => {
     }
 
   } catch (error) {
+    console.error('Error saving payslip to server:', error)
+
     // Fallback: try to save to localStorage if server fails
     try {
       const localPayslips = JSON.parse(localStorage.getItem('payslipHistory') || '[]')
@@ -1693,6 +1716,7 @@ const savePayslip = async () => {
       generatePayslipNumber()
 
     } catch (localError) {
+      console.error('Local storage fallback failed:', localError)
       alert('❌ Error: All save methods failed. Please try again.')
     }
 
@@ -1727,7 +1751,7 @@ const fetchPayrollData = async () => {
     await generatePayslipNumber()
 
   } catch (error) {
-    // Fallback error handling
+    console.error('Error fetching payroll data:', error)
   }
 }
 

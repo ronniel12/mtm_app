@@ -144,6 +144,7 @@ const handleLogin = async () => {
     loading.value = true
     errorMessage.value = ''
 
+    console.log('🔐 Attempting login with PIN:', pin.value)
 
     // Verify PIN and get employee data
     const response = await axios.get(`${API_BASE_URL}/employee/${pin.value}/payslips`)
@@ -152,6 +153,7 @@ const handleLogin = async () => {
       throw new Error('Invalid response from server')
     }
 
+    console.log('✅ PIN verified successfully:', response.data.employee.name)
 
     // Create authentication session
     const authData = {
@@ -164,6 +166,7 @@ const handleLogin = async () => {
     // Save authentication state
     auth.saveAuthState(authData)
     
+    console.log('🗂️ Authentication session created')
 
     // Redirect to employee portal with PIN
     await router.push(`/employee/${pin.value}`)
