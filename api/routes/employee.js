@@ -400,4 +400,91 @@ router.get('/employee-deduction-configs/employee/:employeeUuid', async (req, res
   }
 });
 
+// ============================================================================
+// EMPLOYEE PORTAL ROUTES
+// ============================================================================
+
+router.get('/employee/:pin/payslips', async (req, res) => {
+  try {
+    const { pin } = req.params;
+
+    // Validate PIN format (must be 4 digits)
+    if (!pin || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({
+        error: 'Invalid PIN format',
+        message: 'PIN must be exactly 4 digits'
+      });
+    }
+
+    // Find employee by PIN
+    const employeeResult = await query(
+      'SELECT * FROM employees WHERE access_pin = $1',
+      [pin]
+    );
+
+    if (employeeResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Employee not found',
+        message: 'No employee found with this PIN'
+      });
+    }
+
+    const employee = employeeResult.rows[0];
+
+    // Get employee's payslips ordered by most recent first
+    const payslipsResult = await query(
+      'SELECT * FROM payslips WHERE employee_uuid = $1 ORDER BY created_date DESC',
+      [employee.uuid]
+    );
+
+    // Format payslips data for Employee Portal consumption
+    const formattedPayslips = payslipsResult.rows.map(payslip => {
+      let details = {};
+      try {
+        // Parse payslip details from JSONB
+        details = payslip.details && typeof payslip.details === 'string' ?
+          JSON.parse(payslip.details) : payslip.details || {};
+      } catch (parseError) {
+        console.warn(`Failed to parse payslip details for ${payslip.id}:`, parseError.message);
+        details = {};
+      }
+
+      // Return simplified format expected by Employee Portal
+      return {
+        id: payslip.id,
+        payslipNumber: payslip.payslip_number,
+        employeeName: employee.name,
+        period: details.period?.periodText || '',
+        grossPay: payslip.gross_pay || details.totals?.grossPay || 0,
+        totalDeductions: payslip.deductions || details.totals?.totalDeductions || 0,
+        netPay: payslip.net_pay || details.totals?.netPay || 0,
+        trips: details.trips || [],
+        deductions: details.deductions || [],
+        createdDate: payslip.created_date,
+        status: payslip.status,
+        blobUrl: details.blobUrl // For PDF download if available
+      };
+    });
+
+    // Return employee and their payslips
+    res.json({
+      employee: {
+        id: employee.id,
+        name: employee.name,
+        position: employee.position,
+        department: employee.department,
+        pin: employee.access_pin
+      },
+      payslips: formattedPayslips
+    });
+
+  } catch (error) {
+    console.error('Error fetching employee payslips:', error);
+    res.status(500).json({
+      error: 'Failed to fetch employee payslips',
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;
