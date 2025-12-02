@@ -233,6 +233,18 @@ const validateDates = () => {
 }
 
 const exportPDF = async () => {
+  // Ensure we have data and a billing number
+  const billingData = await getProcessedBillingData()
+  if (billingData.length === 0) {
+    alert('No trips to export. Please select a date range with billing data.')
+    return
+  }
+
+  // Generate billing number if not already exists
+  if (!billingNumber.value) {
+    await generateBillingNumber()
+  }
+
   // Create a new window for PDF export
   const pdfWindow = window.open('', '_blank')
   if (!pdfWindow) {
@@ -368,6 +380,11 @@ const exportExcel = async () => {
     return
   }
 
+  // Generate billing number if not already exists
+  if (!billingNumber.value) {
+    await generateBillingNumber()
+  }
+
   // Create table data for CSV
   const tableData = billingData.map(trip => [
     trip.date,
@@ -468,6 +485,11 @@ const printStatement = async () => {
   if (billingData.length === 0) {
     alert('No trips to print. Please select a date range with billing data.')
     return
+  }
+
+  // Generate billing number if not already exists
+  if (!billingNumber.value) {
+    await generateBillingNumber()
   }
 
   // Calculate submitted date
@@ -621,6 +643,7 @@ const filterTripsByDate = async () => {
   if (!validateDates()) {
     // Clear the table if dates are invalid
     filteredTrips.value = []
+    billingNumber.value = '' // Clear billing number if dates are invalid
     return
   }
 
@@ -631,10 +654,15 @@ const filterTripsByDate = async () => {
     // Since we're now fetching filtered data from server, just show all loaded trips
     filteredTrips.value = [...trips.value]
 
+    // Generate billing number when data is successfully loaded
+    await generateBillingNumber()
+
     console.log(`Loaded ${filteredTrips.value.length} trips within date range`)
+    console.log(`Billing number generated: ${billingNumber.value}`)
   } catch (error) {
     console.error('Error loading billing data:', error)
     filteredTrips.value = []
+    billingNumber.value = '' // Clear billing number on error
   } finally {
     isLoading.value = false
   }
