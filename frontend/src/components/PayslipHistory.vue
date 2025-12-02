@@ -466,9 +466,15 @@ const printPayslip = (payslip) => {
     // Fallback to HTML generation if no PDF blob URL
     console.log('No PDF blob URL found, generating HTML for print')
 
+    // Ensure the payslip has the correct date field for HTML generation
+    const enhancedPayslip = {
+      ...payslip,
+      createdDate: payslip.displayCreatedDate || payslip.createdDate || payslip.created_date || new Date().toISOString()
+    }
+
     // Import payslip renderer for consistent fallback
     import('../composables/usePayslipRenderer.js').then(renderer => {
-      const htmlContent = renderer.default.generatePayslipHTML(payslip, true)
+      const htmlContent = renderer.default.generatePayslipHTML(enhancedPayslip, true)
 
       // Create new window with consistent content
       const printWindow = window.open('', '_blank')
