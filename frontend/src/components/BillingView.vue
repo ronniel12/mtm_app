@@ -129,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import axios from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '@/api/config'
 import { useDataRefresh } from '../composables/useDataRefresh'
@@ -277,8 +277,6 @@ Mobile No. 09605638462 / Telegram No. +358-044-978-8592`
 </tr>
 </thead>
 <tbody>`
-
-  const billingData = await getProcessedBillingData()
 
   billingData.forEach((trip, index) => {
     const bgColor = index % 2 === 1 ? '#fafafa' : 'white'
@@ -697,6 +695,8 @@ const calculateTripRates = (tripsArray, ratesData) => {
 }
 
 const generateBillingNumber = async () => {
+  console.log('🧾 generateBillingNumber called with startDate:', startDate.value, 'endDate:', endDate.value)
+
   try {
     // Format: YYYY-MMDD-MMDD-XXXX (year-start date-end date-4 random unique chars)
     const currentYear = new Date().getFullYear()
@@ -728,15 +728,26 @@ const generateBillingNumber = async () => {
     }
 
     // Combine all parts
-    billingNumber.value = `${currentYear}-${startFormatted}-${endFormatted}-${randomChars}`
+    const newBillingNumber = `${currentYear}-${startFormatted}-${endFormatted}-${randomChars}`
 
-    console.log('Generated billing number:', billingNumber.value)
+    // Update the reactive variable
+    billingNumber.value = newBillingNumber
+
+    // Force reactive update with nextTick
+    await nextTick()
+
+    console.log('✅ Generated billing number:', billingNumber.value)
+    console.log('Billing number reactive ref value:', billingNumber.value)
+
   } catch (error) {
-    console.error('Error generating billing number:', error)
+    console.error('❌ Error generating billing number:', error)
+    console.error('Stack trace:', error.stack)
     // Fallback format
     const currentYear = new Date().getFullYear()
     const fallbackRandom = Math.random().toString(36).substring(2, 6).toUpperCase()
     billingNumber.value = `${currentYear}-0000-0000-${fallbackRandom}`
+    await nextTick()
+    console.log('❌ Using fallback billing number:', billingNumber.value)
   }
 }
 
