@@ -14,6 +14,7 @@
             <option value="bookkeeping">Bookkeeping</option>
             <option value="services">Services</option>
             <option value="parking_fee">Parking Fee</option>
+            <option value="toll_fee">Toll Fee</option>
             <option value="coordinator">Coordinator</option>
             <option value="rfid_service_charge">RFID Service Charge</option>
             <option value="others">Others</option>
@@ -111,7 +112,7 @@
               </span>
             </td>
             <td>{{ expense.description }}</td>
-            <td>{{ expense.vehicle || 'N/A' }}</td>
+            <td>{{ expense.vehicle || '&nbsp;&nbsp;&nbsp;&nbsp;' }}</td>
             <td class="amount-cell">{{ formatCurrency(expense.amount) }}</td>
             <td>
               <div v-if="expense.receipt_filename" class="attachment-cell">
@@ -156,7 +157,7 @@
 
           <div class="card-row">
             <strong>Vehicle:</strong>
-            <span>{{ expense.vehicle || 'N/A' }}</span>
+            <span>{{ expense.vehicle || '&nbsp;&nbsp;&nbsp;&nbsp;' }}</span>
           </div>
 
           <div class="card-row">
@@ -223,6 +224,7 @@
                 <option value="bookkeeping">Bookkeeping</option>
                 <option value="services">Services</option>
                 <option value="parking_fee">Parking Fee</option>
+                <option value="toll_fee">Toll Fee</option>
                 <option value="coordinator">Coordinator</option>
                 <option value="rfid_service_charge">RFID Service Charge</option>
                 <option value="others">Others</option>
@@ -432,7 +434,7 @@ const maintenanceTotal = computed(() => {
 
 const tollsTotal = computed(() => {
   return filteredExpenses.value
-    .filter(expense => expense.category === 'rfid_service_charge')
+    .filter(expense => expense.category === 'rfid_service_charge' || expense.category === 'toll_fee')
     .reduce((sum, expense) => sum + parseFloat(expense.amount || 0), 0)
 })
 
@@ -1025,6 +1027,7 @@ const getCategoryLabel = (category) => {
     bookkeeping: 'Bookkeeping',
     services: 'Services',
     parking_fee: 'Parking Fee',
+    toll_fee: 'Toll Fee',
     coordinator: 'Coordinator',
     rfid_service_charge: 'RFID Service Charge',
     others: 'Others'
@@ -1180,6 +1183,11 @@ onMounted(() => {
 .category-parking_fee {
   background: #fef2f2;
   color: #dc2626;
+}
+
+.category-toll_fee {
+  background: #fefce8;
+  color: #ca8a04;
 }
 
 .category-coordinator {
