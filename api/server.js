@@ -47,29 +47,15 @@ const upload = multer({
     // ROUTE MODULE IMPORTS and MOUNTING
     // ============================================================================
 
-    // Import route modules
-    const tripsRouter = require('./routes/trips');
-    const ratesRouter = require('./routes/rates');
-    const deductionsRouter = require('./routes/deductions');
-    const employeesRouter = require('./routes/employees');
-    const fuelRouter = require('./routes/fuel');
-    const vehiclesRouter = require('./routes/vehicles');
-    const expensesRouter = require('./routes/expenses');
-    const maintenanceRouter = require('./routes/maintenance');
-    const billingsRouter = require('./routes/billings');
-    const employeeDeductionConfigsRouter = require('./routes/employee-deduction-configs');
+    // Import consolidated route modules to stay within Vercel serverless function limits
+    const financeRouter = require('./routes/finance');
+    const operationsRouter = require('./routes/operations');
+    const employeeRouter = require('./routes/employee');
 
-    // Mount route modules (remaining routes should be extracted similarly)
-    app.use('/api/trips', tripsRouter);
-    app.use('/api/rates', ratesRouter);
-    app.use('/api/deductions', deductionsRouter);
-    app.use('/api/employees', employeesRouter);
-    app.use('/api/fuel', fuelRouter);
-    app.use('/api/vehicles', vehiclesRouter);
-    app.use('/api/expenses', expensesRouter);
-    app.use('/api/maintenance', maintenanceRouter);
-    app.use('/api/billings', billingsRouter);
-    app.use('/api/employee-deduction-configs', employeeDeductionConfigsRouter);
+    // Mount consolidated route modules (grouped to reduce serverless functions)
+    app.use('/api', financeRouter);       // rates, expenses, billings
+    app.use('/api', operationsRouter);    // trips, fuel, vehicles, maintenance
+    app.use('/api', employeeRouter);      // employees, deductions, configs
 
     // Placeholder imports (extract these to complete the modularization)
     // const payslipsRouter = require('./routes/payslips');
