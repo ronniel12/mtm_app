@@ -43,21 +43,183 @@ const upload = multer({
   }
 });
 
-// ============================================================================
-// ROUTE MODULE IMPORTS and MOUNTING
-// ============================================================================
+    // ============================================================================
+    // INLINE API ROUTES (Single Serverless Function Approach)
+    // All routes defined inline to create ONE serverless function for all API endpoints
+    // ============================================================================
 
-// Import consolidated route modules to stay within Vercel serverless function limits (Hobby plan: 12 functions max)
-const financeRouter = require('./routes/finance');
-const operationsRouter = require('./routes/operations');
-const employeeRouter = require('./routes/employee');
-const servicesRouter = require('./routes/services');
+    const { query } = require('./lib/db');
+    const PDFService = require('./pdf-service');
 
-// Mount consolidated route modules (grouped to reduce serverless functions)
-app.use('/api', financeRouter);       // rates, expenses, billings (all finance-related)
-app.use('/api', operationsRouter);    // trips, fuel, vehicles, maintenance (all operations-related)
-app.use('/api', employeeRouter);      // employees, deductions, configs, employee-portal
-app.use('/api', servicesRouter);      // payslips, PDF generation, test endpoints
+    // Load all routes from consolidated router files and define them inline
+    // This avoids separate router files that Vercel treats as individual functions
+
+    // ============================================================================
+    // EMPLOYEE PORTAL ROUTES (Most Critical)
+    // ============================================================================
+
+    // Get employee's payslips by PIN (used by Employee Portal)
+    app.get('/api/employee/:pin/payslips', async (req, res) => {
+      try {
+        const { pin } = req.params;
+
+        // Validate PIN format (must be 4 digits)
+        if (!pin || !/^\d{4}$/.test(pin)) {
+          return res.status(400).json({
+            error: 'Invalid PIN format',
+            message: 'PIN must be exactly 4 digits'
+          });
+        }
+
+        // Find employee by PIN
+        const employeeResult = await query(
+          'SELECT * FROM employees WHERE access_pin = $1',
+          [pin]
+        );
+
+        if (employeeResult.rows.length === 0) {
+          return res.status(404).json({
+            error: 'Employee not found',
+            message: 'No employee found with this PIN'
+          });
+        }
+
+        const employee = employeeResult.rows[0];
+
+        // Get employee's payslips ordered by most recent first
+        const payslipsResult = await query(
+          'SELECT * FROM payslips WHERE employee_uuid = $1 ORDER BY created_date DESC',
+          [employee.uuid]
+        );
+
+        // Format payslips data for Employee Portal consumption
+        const formattedPayslips = payslipsResult.rows.map(payslip => {
+          let details = {};
+          try {
+            // Parse payslip details from JSONB
+            details = payslip.details && typeof payslip.details === 'string' ?
+              JSON.parse(payslip.details) : payslip.details || {};
+          } catch (parseError) {
+            console.warn(`Failed to parse payslip details for ${payslip.id}:`, parseError.message);
+            details = {};
+          }
+
+          // Return simplified format expected by Employee Portal
+          return {
+            id: payslip.id,
+            payslipNumber: payslip.payslip_number,
+            employeeName: employee.name,
+            period: details.period?.periodText || '',
+            grossPay: payslip.gross_pay || details.totals?.grossPay || 0,
+            totalDeductions: payslip.deductions || details.totals?.totalDeductions || 0,
+            netPay: payslip.net_pay || details.totals?.netPay || 0,
+            trips: details.trips || [],
+            deductions: details.deductions || [],
+            createdDate: payslip.created_date,
+            status: payslip.status,
+            blobUrl: details.blobUrl // For PDF download if available
+          };
+        });
+
+        // Return employee and their payslips
+        res.json({
+          employee: {
+            id: employee.id,
+            name: employee.name,
+            position: employee.position,
+            department: employee.department,
+            pin: employee.access_pin
+          },
+          payslips: formattedPayslips
+        });
+
+      } catch (error) {
+        console.error('Error fetching employee payslips:', error);
+        res.status(500).json({
+          error: 'Failed to fetch employee payslips',
+          message: error.message
+        });
+      }
+    });
+
+    // ============================================================================
+    // TEST ROUTES (For PDF Service Testing)
+    // ============================================================================
+
+    app.post('/api/test/pdf', async (req, res) => {
+      try {
+        // Create mock payslip data for testing
+        const mockPayslipData = {
+          id: 'TEST-' + Date.now(),
+          payslipNumber: 'TEST-001',
+          employee: {
+            uuid: 'test-employee-uuid',
+            name: 'Test Employee Name'
+          },
+          period: {
+            startDate: '2025-01-01',
+            endDate: '2025-01-31',
+            periodText: 'January 2025'
+          },
+          totals: {
+            grossPay: 35000.00,
+            totalDeductions: 2500.00,
+            netPay: 32500.00
+          },
+          deductions: [
+            { name: 'SSS Share', calculatedAmount: 500.00, type: 'standard' },
+            { name: 'PhilHealth', calculatedAmount: 400.00, type: 'standard' },
+            { name: 'Pag-IBIG', calculatedAmount: 200.00, type: 'standard' },
+            { name: 'Cash Advance', calculatedAmount: 1400.00, type: 'employee', isEmployeeSpecific: true }
+          ],
+          trips: [
+            {
+              date: '2025-01-15',
+              truckPlate: 'TEST-PLATE',
+              invoiceNumber: 'INV-001',
+              destination: 'Test Destination',
+              rate: 450.00,
+              bags: 10,
+              total: 4500.00
+            },
+            {
+              date: '2025-01-20',
+              truckPlate: 'TEST-PLATE',
+              invoiceNumber: 'INV-002',
+              destination: 'Another Destination',
+              rate: 420.00,
+              bags: 8,
+              total: 3360.00
+            }
+          ],
+          createdDate: new Date().toISOString()
+        };
+
+        // Test the complete PDF workflow
+        const pdfResult = await PDFService.generateAndUploadPDF(mockPayslipData);
+
+        res.json({
+          success: pdfResult.pdfGenerated,
+          message: pdfResult.pdfGenerated ?
+            'PDF generated and uploaded to Vercel Blob successfully!' :
+            'PDF generation/upload failed',
+          result: pdfResult,
+          testData: {
+            urlAccessible: pdfResult.pdfGenerated ? `${pdfResult.blobUrl}` : null,
+            note: 'If successful, you can visit the blobUrl directly to download the PDF'
+          }
+        });
+
+      } catch (error) {
+        console.error('❌ PDF test failed:', error);
+        res.status(500).json({
+          success: false,
+          message: 'PDF test failed with error',
+          error: error.message,
+          stack: error.stack
+        });
+      }
+    });
 
 // ============================================================================
 // Export the serverless handler
