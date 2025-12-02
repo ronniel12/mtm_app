@@ -20,9 +20,10 @@ const app = express();
 app.use(cors()); // CORS middleware
 app.set('trust proxy', 1); // Trust proxy for Vercel deployment
 
-// Body parsing middleware for Vercel serverless functions
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// NOTE: Remove global JSON body parsing for Vercel serverless compatibility
+// Body parsing will be handled per-endpoint as needed
+// app.use(express.json({ limit: '50mb' }));
+// app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Configure multer for memory storage (for BLOB storage)
 const storage = multer.memoryStorage();
@@ -2315,8 +2316,26 @@ app.get('/api/billings/:id', async (req, res) => {
 
 app.post('/api/billings', async (req, res) => {
   try {
-    // Body is already parsed by jsonParser middleware
-    const body = req.body;
+    // Serverless environments need raw body parsing
+    let body;
+    if (req.body && typeof req.body === 'object') {
+      // If body is already parsed, use it
+      body = req.body;
+    } else {
+      // Parse raw body for serverless environments
+      const raw = await new Promise((resolve, reject) => {
+        let data = '';
+        req.on('data', chunk => data += chunk);
+        req.on('end', () => resolve(data));
+        req.on('error', reject);
+      });
+      try {
+        body = JSON.parse(raw);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        return res.status(400).json({ error: 'Invalid JSON in request body' });
+      }
+    }
 
     // Validate required fields
     if (!body) {
