@@ -1028,8 +1028,8 @@ const rateForm = ref({
 const filteredRates = computed(() => {
   if (!searchQuery.value.trim()) return allRates.value
   return allRates.value.filter(rate =>
-    rate.town.toLowerCase().includes(searchQuery.value.toLowerCase().trim()) ||
-    rate.province.toLowerCase().includes(searchQuery.value.toLowerCase().trim()) ||
+    (rate.town?.toLowerCase() || '').includes(searchQuery.value.toLowerCase().trim()) ||
+    (rate.province?.toLowerCase() || '').includes(searchQuery.value.toLowerCase().trim()) ||
     rate.newRates.toString().includes(searchQuery.value.trim())
   )
 })
@@ -1038,10 +1038,11 @@ const groupedRates = computed(() => {
   const rates = filteredRates.value
   const groups = {}
   rates.forEach(rate => {
-    if (!groups[rate.province]) {
-      groups[rate.province] = []
+    const provinceKey = rate.province || 'Unknown Province'
+    if (!groups[provinceKey]) {
+      groups[provinceKey] = []
     }
-    groups[rate.province].push(rate)
+    groups[provinceKey].push(rate)
   })
   return groups
 })
