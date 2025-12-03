@@ -1177,19 +1177,31 @@ const formatCurrency = (amount) => {
 const submitRateForm = async () => {
   try {
     if (editingRate.value) {
+      console.log('🔄 Updating existing rate:', {
+        original: editingRate.value,
+        updates: rateForm.value
+      })
       await axios.put(`${API_BASE_URL}/rates/${editingRate.value.origin}/${editingRate.value.province}/${editingRate.value.town}`, {
         ...rateForm.value,
         originalOrigin: editingRate.value.origin,
         originalProvince: editingRate.value.province,
         originalTown: editingRate.value.town
       })
+      console.log('✅ Rate updated successfully')
     } else {
+      console.log('➕ Creating new rate:', rateForm.value)
       await axios.post(`${API_BASE_URL}/rates`, rateForm.value)
+      console.log('✅ Rate created successfully')
     }
+
+    console.log('🔄 Refreshing rates data...')
     await fetchAllRates()
+    console.log('✅ Rates data refreshed')
+
     resetRateForm()
+    console.log('🧹 Form reset complete')
   } catch (error) {
-    console.error('Error saving rate:', error)
+    console.error('❌ Error saving rate:', error)
     alert('Error saving rate. Please try again.')
   }
 }
