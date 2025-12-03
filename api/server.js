@@ -2653,6 +2653,9 @@ app.put('/api/rates/:origin/:province/:town', async (req, res) => {
       town: townWhere
     });
 
+    console.log('PUT /api/rates - Request body updateData:', JSON.stringify(updateData, null, 2));
+    console.log('PUT /api/rates - req.body:', JSON.stringify(req.body, null, 2));
+
     const result = await query(`
       UPDATE rates
       SET origin = $1, province = $2, town = $3, rate = $4, new_rates = $5, updated_at = CURRENT_TIMESTAMP
