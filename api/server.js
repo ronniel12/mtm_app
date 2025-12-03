@@ -2642,6 +2642,17 @@ app.put('/api/rates/:origin/:province/:town', async (req, res) => {
   try {
     const { originalOrigin, originalProvince, originalTown, ...updateData } = req.body;
 
+    // Decode URL parameters and use as fallback for WHERE clause
+    const originWhere = decodeURIComponent(req.params.origin);
+    const provinceWhere = decodeURIComponent(req.params.province);
+    const townWhere = decodeURIComponent(req.params.town);
+
+    console.log('PUT /api/rates - Decoded WHERE parameters:', {
+      origin: originWhere,
+      province: provinceWhere,
+      town: townWhere
+    });
+
     const result = await query(`
       UPDATE rates
       SET origin = $1, province = $2, town = $3, rate = $4, new_rates = $5, updated_at = CURRENT_TIMESTAMP
@@ -2653,9 +2664,9 @@ app.put('/api/rates/:origin/:province/:town', async (req, res) => {
       updateData.town || req.body.town,
       updateData.rate || updateData.newRates || 0,
       updateData.newRates || updateData.rate || 0,
-      req.params.origin,
-      req.params.province,
-      req.params.town
+      originWhere,
+      provinceWhere,
+      townWhere
     ]);
 
     if (result.rows.length === 0) {
@@ -2672,15 +2683,26 @@ app.put('/api/rates/:origin/:province/:town', async (req, res) => {
 
 app.delete('/api/rates/:origin/:province/:town', async (req, res) => {
   try {
+    // Decode URL parameters properly
+    const originWhere = decodeURIComponent(req.params.origin);
+    const provinceWhere = decodeURIComponent(req.params.province);
+    const townWhere = decodeURIComponent(req.params.town);
+
+    console.log('DELETE /api/rates - Decoded WHERE parameters:', {
+      origin: originWhere,
+      province: provinceWhere,
+      town: townWhere
+    });
+
     const result = await query('DELETE FROM rates WHERE origin = $1 AND province = $2 AND town = $3 RETURNING *', [
-      req.params.origin,
-      req.params.province,
-      req.params.town
+      originWhere,
+      provinceWhere,
+      townWhere
     ]);
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Rate not found' });
     }
-    console.log('Deleted rate:', req.params.origin, req.params.province, req.params.town);
+    console.log('Deleted rate:', originWhere, provinceWhere, townWhere);
     res.json({ message: 'Rate deleted successfully' });
   } catch (error) {
     console.error('Error deleting rate:', error);
