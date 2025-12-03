@@ -2638,7 +2638,27 @@ app.post('/api/rates', async (req, res) => {
   }
 });
 
-app.put('/api/rates/:origin/:province/:town', async (req, res) => {
+// JSON parser middleware for this route
+const jsonParser = (req, res, next) => {
+  if (req.method === 'PUT' && req.headers['content-type']?.includes('application/json')) {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      try {
+        req.body = body ? JSON.parse(body) : {};
+        next();
+      } catch (err) {
+        next(err);
+      }
+    });
+  } else {
+    next();
+  }
+};
+
+app.put('/api/rates/:origin/:province/:town', jsonParser, async (req, res) => {
   try {
     const { originalOrigin, originalProvince, originalTown, ...updateData } = req.body;
 
