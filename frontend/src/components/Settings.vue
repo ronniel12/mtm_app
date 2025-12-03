@@ -1074,17 +1074,33 @@ const fetchSettings = async () => {
 
 const fetchAllRates = async () => {
   try {
+    console.log('📡 fetchAllRates - Starting to fetch all rates...')
     const response = await axios.get(`${API_BASE_URL}/rates`)
-    // Map database snake_case fields to camelCase
-    allRates.value = response.data.map(rate => ({
+    console.log('📡 fetchAllRates - Received response with', response.data.length, 'rates')
+
+    const mappedRates = response.data.map(rate => ({
       ...rate,
       newRates: rate.new_rates || rate.newRates,
       origin: rate.origin,
       province: rate.province,
       town: rate.town
     }))
+
+    console.log('📡 fetchAllRates - Mapped rates:', mappedRates.map(r => `${r.origin}/${r.province}/${r.town}:${r.newRates}`))
+    console.log('📡 fetchAllRates - Setting allRates.value:', allRates.value.length, '->', mappedRates.length)
+
+    allRates.value = mappedRates
+
+    console.log('📡 fetchAllRates - Computed properties should now update')
+    console.log('  filteredRates:', Object.keys(filteredRates.value).length, 'provinces')
+    console.log('  groupedRates keys:', Object.keys(groupedRates.value))
+
+    // Force Vue reactivity notification (in case computed properties aren't triggering)
+    allRates.value = [...allRates.value]
+    console.log('📡 fetchAllRates - Force reactivity completed')
+
   } catch (error) {
-    console.error('Error fetching rates:', error)
+    console.error('❌ fetchAllRates - Error fetching rates:', error)
     allRates.value = []
   }
 }
