@@ -1210,9 +1210,10 @@ const submitRateForm = async () => {
       console.log('✅ Rate created successfully')
     }
 
-    console.log('🔄 Refreshing rates data...')
+    console.log('🔄 Refreshing rates data and clearing search...')
+    searchQuery.value = '' // Clear search filter so updated rate shows in UI
     await fetchAllRates()
-    console.log('✅ Rates data refreshed')
+    console.log('✅ Rates data refreshed and search cleared')
 
     resetRateForm()
     console.log('🧹 Form reset complete')
