@@ -49,9 +49,6 @@ const upload = multer({
 // Copy all routes from original server.js
 // Trip suggestions API endpoint
 app.get('/api/trips/suggestions', async (req, res) => {
-
-// Continue copying all other routes from your original server.js
-app.post('/api/trips', jsonParser, async (req, res) => {
   try {
     // Extract unique farm suggestions from trips data
     const result = await query('SELECT farm_name, destination, full_destination FROM trips WHERE farm_name IS NOT NULL AND farm_name != \'\'');
@@ -737,7 +734,7 @@ app.get('/api/trips/:id', async (req, res) => {
 });
 
 // Continue copying all other routes from your original server.js
-app.post('/api/trips', jsonParser, async (req, res) => {
+app.post('/api/trips', async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -816,7 +813,7 @@ app.post('/api/trips', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/api/trips/:id', jsonParser, async (req, res) => {
+app.put('/api/trips/:id', async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -2641,9 +2638,9 @@ app.post('/api/rates', async (req, res) => {
   }
 });
 
-// JSON parser middleware for POST and PUT routes
+// JSON parser middleware for this route
 const jsonParser = (req, res, next) => {
-  if ((req.method === 'POST' || req.method === 'PUT') && req.headers['content-type']?.includes('application/json')) {
+  if (req.method === 'PUT' && req.headers['content-type']?.includes('application/json')) {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk;
