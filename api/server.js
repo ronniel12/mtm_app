@@ -736,26 +736,8 @@ app.get('/api/trips/:id', async (req, res) => {
 // Continue copying all other routes from your original server.js
 app.post('/api/trips', async (req, res) => {
   try {
-    // Serverless environments need raw body parsing
-    let body;
-    if (req.body && typeof req.body === 'object') {
-      // If body is already parsed, use it
-      body = req.body;
-    } else {
-      // Parse raw body for serverless environments
-      const raw = await new Promise((resolve, reject) => {
-        let data = '';
-        req.on('data', chunk => data += chunk);
-        req.on('end', () => resolve(data));
-        req.on('error', reject);
-      });
-      try {
-        body = JSON.parse(raw);
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError);
-        return res.status(400).json({ error: 'Invalid JSON in request body' });
-      }
-    }
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
 
     // Validate required fields
     if (!body) {
@@ -833,26 +815,8 @@ app.post('/api/trips', async (req, res) => {
 
 app.put('/api/trips/:id', async (req, res) => {
   try {
-    // Serverless environments need raw body parsing
-    let body;
-    if (req.body && typeof req.body === 'object') {
-      // If body is already parsed, use it
-      body = req.body;
-    } else {
-      // Parse raw body for serverless environments
-      const raw = await new Promise((resolve, reject) => {
-        let data = '';
-        req.on('data', chunk => data += chunk);
-        req.on('end', () => resolve(data));
-        req.on('error', reject);
-      });
-      try {
-        body = JSON.parse(raw);
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError);
-        return res.status(400).json({ error: 'Invalid JSON in request body' });
-      }
-    }
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
 
     // Validate required fields
     if (!body) {
@@ -1048,26 +1012,8 @@ app.get('/api/employees/:uuid', async (req, res) => {
 
 app.post('/api/employees', async (req, res) => {
   try {
-    // Serverless environments need raw body parsing
-    let body;
-    if (req.body && typeof req.body === 'object') {
-      // If body is already parsed, use it
-      body = req.body;
-    } else {
-      // Parse raw body for serverless environments
-      const raw = await new Promise((resolve, reject) => {
-        let data = '';
-        req.on('data', chunk => data += chunk);
-        req.on('end', () => resolve(data));
-        req.on('error', reject);
-      });
-      try {
-        body = JSON.parse(raw);
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError);
-        return res.status(400).json({ error: 'Invalid JSON in request body' });
-      }
-    }
+    // Body is already parsed by jsonParser middleware
+    const body = req.body;
 
     // Validate required fields
     if (!body) {
