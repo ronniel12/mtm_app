@@ -1066,9 +1066,9 @@ app.post('/api/employees', async (req, res) => {
   }
 });
 
-app.put('/api/employees/:uuid', async (req, res) => {
+app.put('/api/employees/:uuid', jsonParser, async (req, res) => {
   try {
-    // Body is already parsed by jsonParser middleware
+    // Body is parsed by jsonParser middleware
     const body = req.body;
 
     // Validate required fields
@@ -1827,9 +1827,9 @@ app.post('/api/drivers', async (req, res) => {
   }
 });
 
-app.put('/api/drivers/:id', async (req, res) => {
+app.put('/api/drivers/:id', jsonParser, async (req, res) => {
   try {
-    // Body is already parsed by jsonParser middleware
+    // Body is parsed by jsonParser middleware
     const body = req.body;
 
     // Validate required fields
