@@ -1030,7 +1030,7 @@ app.get('/api/employees/:uuid', async (req, res) => {
   }
 });
 
-app.post('/api/employees', async (req, res) => {
+app.post('/api/employees', jsonParser, async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;

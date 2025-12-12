@@ -973,6 +973,7 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { API_BASE_URL, API_ENDPOINTS } from '@/api/config'
+import { useDataRefresh } from '../composables/useDataRefresh'
 
 const activeTab = ref('employees')
 const employees = ref([])
@@ -1013,6 +1014,9 @@ const employeeForm = ref({
   autoDeductCashAdvance: true,
   autoDeductLoans: true
 })
+
+// Setup data refresh system
+const { triggerRefresh, onRefresh } = useDataRefresh()
 const vehicleForm = ref({
   plateNumber: '',
   vehicleClass: '',
@@ -1053,6 +1057,11 @@ onMounted(() => {
   if (activeTab.value === 'deductions') {
     loadDeductionsData()
   }
+
+  // Listen for employee refresh events
+  onRefresh('employees', () => {
+    fetchSettings()
+  })
 })
 
 const fetchSettings = async () => {
@@ -1122,6 +1131,9 @@ const submitEmployeeForm = async () => {
       formData.created = now
       formData.updated = now
       await axios.post(`${API_BASE_URL}/employees`, formData)
+
+      // Trigger global refresh for employees
+      triggerRefresh('employees', { action: 'create', employee: formData })
     }
 
     await fetchSettings()
