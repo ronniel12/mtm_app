@@ -46,6 +46,26 @@ const upload = multer({
   }
 });
 
+// JSON parser middleware for PUT routes
+const jsonParser = (req, res, next) => {
+  if (req.method === 'PUT' && req.headers['content-type']?.includes('application/json')) {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      try {
+        req.body = body ? JSON.parse(body) : {};
+        next();
+      } catch (err) {
+        next(err);
+      }
+    });
+  } else {
+    next();
+  }
+};
+
 // Copy all routes from original server.js
 // Trip suggestions API endpoint
 app.get('/api/trips/suggestions', async (req, res) => {
@@ -2637,26 +2657,6 @@ app.post('/api/rates', async (req, res) => {
     res.status(500).json({ error: 'Failed to create rate' });
   }
 });
-
-// JSON parser middleware for this route
-const jsonParser = (req, res, next) => {
-  if (req.method === 'PUT' && req.headers['content-type']?.includes('application/json')) {
-    let body = '';
-    req.on('data', (chunk) => {
-      body += chunk;
-    });
-    req.on('end', () => {
-      try {
-        req.body = body ? JSON.parse(body) : {};
-        next();
-      } catch (err) {
-        next(err);
-      }
-    });
-  } else {
-    next();
-  }
-};
 
 app.put('/api/rates/:origin/:province/:town', jsonParser, async (req, res) => {
   try {
