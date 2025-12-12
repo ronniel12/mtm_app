@@ -46,9 +46,9 @@ const upload = multer({
   }
 });
 
-// JSON parser middleware for PUT routes
+// JSON parser middleware for PUT and POST routes
 const jsonParser = (req, res, next) => {
-  if (req.method === 'PUT' && req.headers['content-type']?.includes('application/json')) {
+  if ((req.method === 'PUT' || req.method === 'POST') && req.headers['content-type']?.includes('application/json')) {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk;
