@@ -760,10 +760,10 @@ app.get('/api/trips/:id', async (req, res) => {
 });
 
 // Continue copying all other routes from your original server.js
-app.post('/api/trips', async (req, res) => {
+app.post('/api/trips', jsonParser, async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
-    const body = req.body;
+    const body = req.body || {};
 
     // Validate required fields
     if (!body) {
@@ -800,19 +800,19 @@ app.post('/api/trips', async (req, res) => {
     const newTrip = {
       id: nextId,
       tracking_number: `TRP${String(nextId).padStart(3, '0')}`,
-      date: tripDate || utcNow.toISOString().split('T')[0],
-      truck_plate: body.truckPlate || 'NGU 9174',
-      invoice_number: body.invoiceNumber || 'To be assigned',
-      origin: body.origin || 'Dampol 2nd A, Pulilan Bulacan',
-      farm_name: body.farmName || body.destination || 'Farm destination',
-      destination: body.destination || 'Destine destination',
-      full_destination: body.fullDestination || '',
-      rate_lookup_key: body.rateLookupKey || '',
-      status: body.status || 'Pending',
-      estimated_delivery: body.estimatedDelivery || tomorrow.toISOString().split('T')[0],
-      driver: body.driver || 'MTM Driver',
-      helper: body.helper || '',
-      number_of_bags: body.numberOfBags || 1,
+      date: (body.date || utcNow.toISOString().split('T')[0]).trim(),
+      truck_plate: (body.truckPlate || 'NGU 9174').trim(),
+      invoice_number: (body.invoiceNumber || 'To be assigned').trim(),
+      origin: (body.origin || 'Dampol 2nd A, Pulilan Bulacan').trim(),
+      farm_name: (body.farmName || body.destination || 'Farm destination').trim(),
+      destination: (body.destination || 'Destine destination').trim(),
+      full_destination: (body.fullDestination || '').trim(),
+      rate_lookup_key: (body.rateLookupKey || '').trim(),
+      status: (body.status || 'Pending').trim(),
+      estimated_delivery: (body.estimatedDelivery || tomorrow.toISOString().split('T')[0]).trim(),
+      driver: (body.driver || 'MTM Driver').trim(),
+      helper: (body.helper || '').trim(),
+      number_of_bags: Number(body.numberOfBags) || 1,
       food_allowance: foodAllowance
     };
 
@@ -832,6 +832,7 @@ app.post('/api/trips', async (req, res) => {
     ]);
 
     console.log('Creating new trip:', newTrip.tracking_number, 'Food allowance:', newTrip.food_allowance);
+    cache.flushAll();
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating trip:', error);
@@ -839,10 +840,10 @@ app.post('/api/trips', async (req, res) => {
   }
 });
 
-app.put('/api/trips/:id', async (req, res) => {
+app.put('/api/trips/:id', jsonParser, async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
-    const body = req.body;
+    const body = req.body || {};
 
     // Validate required fields
     if (!body) {
