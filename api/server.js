@@ -20,6 +20,12 @@ const app = express();
 app.use(cors()); // CORS middleware
 app.set('trust proxy', 1); // Trust proxy for Vercel deployment
 
+// Request logger to inspect incoming paths (always on for local debugging)
+app.use((req, res, next) => {
+  console.log(`[API] ${req.method} ${req.url}`);
+  next();
+});
+
 // NOTE: Remove global JSON body parsing for Vercel serverless compatibility
 // Body parsing will be handled per-endpoint as needed
 // app.use(express.json({ limit: '50mb' }));
@@ -1365,17 +1371,31 @@ app.get('/api/deductions/:id', async (req, res) => {
   }
 });
 
-app.post('/api/deductions', async (req, res) => {
+app.post('/api/deductions', jsonParser, async (req, res) => {
   try {
     console.log('🔍 POST /api/deductions - Request body:', JSON.stringify(req.body, null, 2));
 
-    // Body is already parsed by global JSON middleware
-    const body = req.body;
+    // Body is already parsed by jsonParser middleware
+    const body = req.body || {};
 
     // Validate required fields
     if (!body) {
       console.log('❌ POST /api/deductions - Request body is empty');
       return res.status(400).json({ error: 'Request body is required' });
+    }
+
+    const name = (body.name || '').trim();
+    const type = (body.type || '').trim();
+    const value = body.value !== undefined ? Number(body.value) : null;
+    const isDefault = body.isDefault === true;
+
+    if (!name || !type || value === null || Number.isNaN(value)) {
+      return res.status(400).json({ error: 'name, type, and numeric value are required' });
+    }
+
+    const existing = await query('SELECT id FROM deductions WHERE LOWER(TRIM(name)) = LOWER($1) LIMIT 1', [name]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'A deduction with this name already exists.' });
     }
 
     // Store local time directly for TIMESTAMP columns
@@ -1395,14 +1415,15 @@ app.post('/api/deductions', async (req, res) => {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `, [
-      body.name,
-      body.type,
-      parseFloat(body.value),
-      body.isDefault || false,
+      name,
+      type,
+      value,
+      isDefault,
       localTimeString
     ]);
 
-    console.log('Created new deduction:', body.name);
+    console.log('Created new deduction:', name);
+    cache.flushAll();
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating deduction:', error);
@@ -1410,18 +1431,27 @@ app.post('/api/deductions', async (req, res) => {
   }
 });
 
-app.put('/api/deductions/:id', async (req, res) => {
+app.put('/api/deductions/:id', jsonParser, async (req, res) => {
   try {
     console.log('🔍 PUT /api/deductions - Request body:', JSON.stringify(req.body, null, 2));
     console.log('🔍 PUT /api/deductions - ID:', req.params.id);
 
-    // Body is already parsed by global JSON middleware
-    const body = req.body;
+    // Body is already parsed by jsonParser middleware
+    const body = req.body || {};
 
     // Validate required fields
     if (!body) {
       console.log('❌ PUT /api/deductions - Request body is empty');
       return res.status(400).json({ error: 'Request body is required' });
+    }
+
+    const name = (body.name || '').trim();
+    const type = (body.type || '').trim();
+    const value = body.value !== undefined ? Number(body.value) : null;
+    const isDefault = body.isDefault === true;
+
+    if (!name || !type || value === null || Number.isNaN(value)) {
+      return res.status(400).json({ error: 'name, type, and numeric value are required' });
     }
 
     // Parse the deduction ID - handles both custom IDs and numeric IDs
@@ -1440,18 +1470,18 @@ app.put('/api/deductions/:id', async (req, res) => {
       `;
       queryParams = [
         idInfo.value,                    // $1: ID
-        body.name,                       // $2: name
-        body.type,                       // $3: type
-        parseFloat(body.value),          // $4: value
-        !!body.isDefault                 // $5: is_default (boolean)
+        name,                            // $2: name
+        type,                            // $3: type
+        value,                           // $4: value
+        isDefault                        // $5: is_default (boolean)
       ];
 
       console.log('📝 Standard numeric ID update - Params:', {
         id: idInfo.value,
-        name: body.name,
-        type: body.type,
-        value: parseFloat(body.value),
-        isDefault: !!body.isDefault
+        name,
+        type,
+        value,
+        isDefault
       });
 
     } else if (idInfo.type === 'custom') {
@@ -1463,20 +1493,20 @@ app.put('/api/deductions/:id', async (req, res) => {
         RETURNING *
       `;
       queryParams = [
-        body.name,                       // $1: name for WHERE clause
-        body.name,                       // $2: name value (no-op)
-        body.type,                       // $3: type
-        parseFloat(body.value),          // $4: value
-        !!body.isDefault                 // $5: is_default (boolean)
+        name,                            // $1: name for WHERE clause
+        name,                            // $2: name value (no-op)
+        type,                            // $3: type
+        value,                           // $4: value
+        isDefault                        // $5: is_default (boolean)
       ];
 
       console.log('⚠️ Custom ID detected, updating by name:', {
         customId: idInfo.value,
-        lookupName: body.name,
-        updateName: body.name,
-        type: body.type,
-        value: parseFloat(body.value),
-        isDefault: !!body.isDefault
+        lookupName: name,
+        updateName: name,
+        type,
+        value,
+        isDefault
       });
 
     } else {
@@ -1496,6 +1526,7 @@ app.put('/api/deductions/:id', async (req, res) => {
     }
 
     console.log('✅ Updated deduction successfully:', result.rows[0].name);
+    cache.flushAll();
     res.json(result.rows[0]);
   } catch (error) {
     console.error('❌ Error updating deduction:', error);
@@ -2567,19 +2598,38 @@ app.get('/api/vehicles/:id', async (req, res) => {
   }
 });
 
-app.post('/api/vehicles', async (req, res) => {
+app.post('/api/vehicles', jsonParser, async (req, res) => {
   try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
+
+    const plateNumber = (req.body.plateNumber || req.body.plate_number || '').trim();
+    const vehicleClass = (req.body.vehicleClass || req.body.vehicle_class || '').trim();
+    const name = (req.body.name || '').trim();
+
+    if (!plateNumber || !vehicleClass) {
+      return res.status(400).json({ error: 'plateNumber and vehicleClass are required' });
+    }
+
+    // Prevent duplicate plate numbers (case-insensitive, trimmed)
+    const existing = await query('SELECT id FROM vehicles WHERE LOWER(TRIM(plate_number)) = LOWER($1) LIMIT 1', [plateNumber]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'A vehicle with this plate number already exists.' });
+    }
+
     const result = await query(`
       INSERT INTO vehicles (plate_number, vehicle_class, name, created_at, updated_at)
       VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *
     `, [
-      req.body.plateNumber || req.body.plate_number,
-      req.body.vehicleClass || req.body.vehicle_class,
-      req.body.name,
+      plateNumber,
+      vehicleClass,
+      name || null,
     ]);
 
-    console.log('Created new vehicle:', req.body.plateNumber || req.body.plate_number);
+    console.log('Created new vehicle:', plateNumber);
+    cache.flushAll();
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating vehicle:', error);
@@ -2587,14 +2637,23 @@ app.post('/api/vehicles', async (req, res) => {
   }
 });
 
-app.put('/api/vehicles/:id', async (req, res) => {
+app.put('/api/vehicles/:id', jsonParser, async (req, res) => {
   try {
-    // Body is already parsed by jsonParser middleware
-    const body = req.body;
+    const body = req.body || {};
 
     // Validate required fields
-    if (!body) {
-      return res.status(400).json({ error: 'Request body is required' });
+    const plateNumber = (body.plateNumber || body.plate_number || '').trim();
+    const vehicleClass = (body.vehicleClass || body.vehicle_class || '').trim();
+    const name = (body.name || '').trim();
+
+    if (!plateNumber || !vehicleClass) {
+      return res.status(400).json({ error: 'plateNumber and vehicleClass are required' });
+    }
+
+    // Prevent duplicates when updating to plate that belongs to another vehicle
+    const existing = await query('SELECT id FROM vehicles WHERE LOWER(TRIM(plate_number)) = LOWER($1) AND id != $2 LIMIT 1', [plateNumber, parseInt(req.params.id)]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Another vehicle already uses this plate number.' });
     }
 
     const result = await query(`
@@ -2603,9 +2662,9 @@ app.put('/api/vehicles/:id', async (req, res) => {
       WHERE id = $4
       RETURNING *
     `, [
-      body.plateNumber || body.plate_number,
-      body.vehicleClass || body.vehicle_class,
-      body.name,
+      plateNumber,
+      vehicleClass,
+      name || null,
       parseInt(req.params.id)
     ]);
 
@@ -2613,7 +2672,8 @@ app.put('/api/vehicles/:id', async (req, res) => {
       return res.status(404).json({ message: 'Vehicle not found' });
     }
 
-    console.log('Updated vehicle:', body.plateNumber || body.plate_number);
+    console.log('Updated vehicle:', plateNumber);
+    cache.flushAll();
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating vehicle:', error);
@@ -2628,6 +2688,7 @@ app.delete('/api/vehicles/:id', async (req, res) => {
       return res.status(404).json({ message: 'Vehicle not found' });
     }
     console.log('Deleted vehicle:', result.rows[0].plate_number);
+    cache.flushAll();
     res.json({ message: 'Vehicle deleted successfully' });
   } catch (error) {
     console.error('Error deleting vehicle:', error);
@@ -2636,21 +2697,47 @@ app.delete('/api/vehicles/:id', async (req, res) => {
 });
 
 // Rates API endpoints
-app.post('/api/rates', async (req, res) => {
+app.post('/api/rates', jsonParser, async (req, res) => {
   try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ error: 'Request body is required to create a rate.' });
+    }
+    const origin = (req.body.origin || '').trim();
+    const province = (req.body.province || '').trim();
+    const town = (req.body.town || '').trim();
+    const rateValueRaw = req.body.rate;
+    const newRatesValueRaw = req.body.newRates;
+    const resolvedNewRates = Number(newRatesValueRaw ?? rateValueRaw ?? 0) || 0;
+    const resolvedRate = Number(rateValueRaw ?? newRatesValueRaw ?? resolvedNewRates) || 0;
+
+    if (!origin || !province || !town) {
+      return res.status(400).json({ error: 'Origin, province, and town are required to create a rate.' });
+    }
+
+    // Prevent duplicates (ignoring leading/trailing whitespace)
+    const existing = await query(
+      'SELECT id FROM rates WHERE TRIM(origin) = $1 AND TRIM(province) = $2 AND TRIM(town) = $3 LIMIT 1',
+      [origin, province, town]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'A rate for this origin/province/town already exists.' });
+    }
+
     const result = await query(`
       INSERT INTO rates (origin, province, town, rate, new_rates, created_at)
       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
       RETURNING *
     `, [
-      req.body.origin,
-      req.body.province,
-      req.body.town,
-      req.body.rate || 0,
-      req.body.newRates || req.body.rate || 0
+      origin,
+      province,
+      town,
+      resolvedRate,
+      resolvedNewRates
     ]);
 
-    console.log('Created new rate:', req.body.origin, req.body.province, req.body.town);
+    console.log('Created new rate:', origin, province, town);
+    cache.flushAll();
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating rate:', error);
@@ -2663,9 +2750,9 @@ app.put('/api/rates/:origin/:province/:town', jsonParser, async (req, res) => {
     const { originalOrigin, originalProvince, originalTown, ...updateData } = req.body;
 
     // Decode URL parameters and use as fallback for WHERE clause
-    const originWhere = decodeURIComponent(req.params.origin);
-    const provinceWhere = decodeURIComponent(req.params.province);
-    const townWhere = decodeURIComponent(req.params.town);
+    const originWhere = decodeURIComponent(req.params.origin || '').trim();
+    const provinceWhere = decodeURIComponent(req.params.province || '').trim();
+    const townWhere = decodeURIComponent(req.params.town || '').trim();
 
     console.log('PUT /api/rates - Decoded WHERE parameters:', {
       origin: originWhere,
@@ -2676,17 +2763,29 @@ app.put('/api/rates/:origin/:province/:town', jsonParser, async (req, res) => {
     console.log('PUT /api/rates - Request body updateData:', JSON.stringify(updateData, null, 2));
     console.log('PUT /api/rates - req.body:', JSON.stringify(req.body, null, 2));
 
+    if (!originWhere || !provinceWhere || !townWhere) {
+      return res.status(400).json({ error: 'Origin, province, and town are required to update a rate.' });
+    }
+
+    const newOrigin = (updateData.origin ?? req.body.origin ?? originWhere).toString().trim();
+    const newProvince = (updateData.province ?? req.body.province ?? provinceWhere).toString().trim();
+    const newTown = (updateData.town ?? req.body.town ?? townWhere).toString().trim();
+    const rateValueRaw = updateData.rate ?? req.body.rate;
+    const newRatesValueRaw = updateData.newRates ?? req.body.newRates;
+    const resolvedNewRates = Number(newRatesValueRaw ?? rateValueRaw ?? 0) || 0;
+    const resolvedRate = Number(rateValueRaw ?? newRatesValueRaw ?? resolvedNewRates) || 0;
+
     const result = await query(`
       UPDATE rates
       SET origin = $1, province = $2, town = $3, rate = $4, new_rates = $5, updated_at = CURRENT_TIMESTAMP
-      WHERE origin = $6 AND province = $7 AND town = $8
+      WHERE TRIM(origin) = $6 AND TRIM(province) = $7 AND TRIM(town) = $8
       RETURNING *
     `, [
-      updateData.origin || req.body.origin,
-      updateData.province || req.body.province,
-      updateData.town || req.body.town,
-      updateData.rate || updateData.newRates || 0,
-      updateData.newRates || updateData.rate || 0,
+      newOrigin,
+      newProvince,
+      newTown,
+      resolvedRate,
+      resolvedNewRates,
       originWhere,
       provinceWhere,
       townWhere
@@ -2697,6 +2796,7 @@ app.put('/api/rates/:origin/:province/:town', jsonParser, async (req, res) => {
     }
 
     console.log('Updated rate:', req.params.origin, req.params.province, req.params.town);
+    cache.flushAll();
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating rate:', error);
@@ -2707,9 +2807,9 @@ app.put('/api/rates/:origin/:province/:town', jsonParser, async (req, res) => {
 app.delete('/api/rates/:origin/:province/:town', async (req, res) => {
   try {
     // Decode URL parameters properly
-    const originWhere = decodeURIComponent(req.params.origin);
-    const provinceWhere = decodeURIComponent(req.params.province);
-    const townWhere = decodeURIComponent(req.params.town);
+    const originWhere = decodeURIComponent(req.params.origin || '').trim();
+    const provinceWhere = decodeURIComponent(req.params.province || '').trim();
+    const townWhere = decodeURIComponent(req.params.town || '').trim();
 
     console.log('DELETE /api/rates - Decoded WHERE parameters:', {
       origin: originWhere,
@@ -2717,7 +2817,11 @@ app.delete('/api/rates/:origin/:province/:town', async (req, res) => {
       town: townWhere
     });
 
-    const result = await query('DELETE FROM rates WHERE origin = $1 AND province = $2 AND town = $3 RETURNING *', [
+    if (!originWhere || !provinceWhere || !townWhere) {
+      return res.status(400).json({ error: 'Origin, province, and town are required to delete a rate.' });
+    }
+
+    const result = await query('DELETE FROM rates WHERE TRIM(origin) = $1 AND TRIM(province) = $2 AND TRIM(town) = $3 RETURNING *', [
       originWhere,
       provinceWhere,
       townWhere
@@ -2726,6 +2830,7 @@ app.delete('/api/rates/:origin/:province/:town', async (req, res) => {
       return res.status(404).json({ message: 'Rate not found' });
     }
     console.log('Deleted rate:', originWhere, provinceWhere, townWhere);
+    cache.flushAll();
     res.json({ message: 'Rate deleted successfully' });
   } catch (error) {
     console.error('Error deleting rate:', error);
