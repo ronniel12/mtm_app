@@ -28,6 +28,50 @@ async function createTables() {
       )
     `);
 
+    // Create user role catalog and auth tables
+    await query(`
+      CREATE TABLE IF NOT EXISTS user_roles (
+        role VARCHAR(32) PRIMARY KEY,
+        description TEXT
+      )
+    `);
+
+    await query(`
+      INSERT INTO user_roles (role, description) VALUES
+        ('admin', 'Full access to all administrative and operational features'),
+        ('manager', 'Can manage operational data but limited system settings access'),
+        ('staff', 'Standard user access to day-to-day features'),
+        ('viewer', 'Read-only access to reports and dashboards')
+      ON CONFLICT (role) DO NOTHING
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        password_hash TEXT NOT NULL,
+        role VARCHAR(32) NOT NULL REFERENCES user_roles(role) ON UPDATE CASCADE,
+        reset_token TEXT,
+        reset_token_expires TIMESTAMPTZ,
+        last_login TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (email)
+      )
+    `);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id UUID PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        refresh_token_hash TEXT NOT NULL,
+        user_agent TEXT,
+        ip_address TEXT,
+        expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Create employees table
     await query(`
       CREATE TABLE IF NOT EXISTS employees (
@@ -381,6 +425,14 @@ async function createTables() {
     // Employees table indexes
     await query('CREATE INDEX IF NOT EXISTS idx_employees_name ON employees(name)');
     await query('CREATE INDEX IF NOT EXISTS idx_employees_created_at ON employees(created_at DESC)');
+
+    // Users table indexes
+    await query('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)');
+    await query('CREATE INDEX IF NOT EXISTS idx_users_last_login ON users(last_login DESC NULLS LAST)');
+
+    // User sessions indexes
+    await query('CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id)');
+    await query('CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at)');
 
     // Payslips table indexes
     await query('CREATE INDEX IF NOT EXISTS idx_payslips_created_date ON payslips(created_date DESC)');

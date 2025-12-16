@@ -1,321 +1,236 @@
-import { ref, computed } from 'vue'
+import { reactive, computed } from 'vue'
+import axios from 'axios'
+import { API_BASE_URL } from '@/api/config'
 
-// Reactive authentication state
-const authState = ref({
-  isAuthenticated: false,
-  employee: null,
-  pin: null,
-  loginTime: null,
-  expiresAt: null
+const AUTH_STORAGE_KEY = 'mtm_admin_auth_v1'
+
+const state = reactive({
+  initialized: false,
+  user: null,
+  accessToken: null,
+  accessTokenExpiresAt: null,
+  loading: false,
+  error: null,
 })
 
-// Session storage key
-const AUTH_STORAGE_KEY = 'employee_auth'
-const REMEMBER_PIN_KEY = 'employee_remembered_pin'
+let refreshPromise = null
 
-/**
- * Authentication composable for employee login/logout functionality
- */
-export function useAuth() {
-  /**
-   * Check if user is currently authenticated
-   */
-  const isAuthenticated = computed(() => {
-    return authState.value.isAuthenticated && 
-           authState.value.pin && 
-           authState.value.employee &&
-           !isSessionExpired()
-  })
-
-  /**
-   * Get current employee data
-   */
-  const getCurrentEmployee = computed(() => {
-    return authState.value.employee
-  })
-
-  /**
-   * Get current PIN
-   */
-  const getCurrentPin = computed(() => {
-    return authState.value.pin
-  })
-
-  /**
-   * Check if session is expired
-   */
-  function isSessionExpired() {
-    if (!authState.value.expiresAt) return true
-    
-    const now = new Date()
-    const expiresAt = new Date(authState.value.expiresAt)
-    
-    return now >= expiresAt
+function ensureInitialized() {
+  if (!state.initialized) {
+    loadAuthState()
   }
+}
 
-  /**
-   * Load authentication state from storage
-   */
-  function loadAuthState() {
-    try {
-      const stored = localStorage.getItem(AUTH_STORAGE_KEY)
-      if (!stored) {
-        clearAuthState()
-        return false
-      }
-
-      const authData = JSON.parse(stored)
-      
-      // Check if session is expired
-      if (isSessionExpired()) {
-        clearAuthState()
-        return false
-      }
-
-      // Restore auth state
-      authState.value = {
-        isAuthenticated: true,
-        employee: authData.employee,
-        pin: authData.pin,
-        loginTime: authData.loginTime,
-        expiresAt: authData.expiresAt
-      }
-
-      return true
-    } catch (error) {
-      console.error('Error loading auth state:', error)
-      clearAuthState()
-      return false
+function loadAuthState() {
+  try {
+    const stored = localStorage.getItem(AUTH_STORAGE_KEY)
+    if (!stored) {
+      state.initialized = true
+      return
     }
+
+    const parsed = JSON.parse(stored)
+    state.user = parsed.user || null
+    state.accessToken = parsed.accessToken || null
+    state.accessTokenExpiresAt = parsed.accessTokenExpiresAt || null
+  } catch (error) {
+    console.warn('Failed to parse stored auth state:', error)
+    clearAuthState()
+  } finally {
+    state.initialized = true
   }
+}
 
-  /**
-   * Save authentication state to storage
-   */
-  function saveAuthState(authData) {
-    try {
-      authState.value = {
-        isAuthenticated: true,
-        employee: authData.employee,
-        pin: authData.pin,
-        loginTime: authData.loginTime || new Date().toISOString(),
-        expiresAt: authData.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      }
-
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState.value))
-      return true
-    } catch (error) {
-      console.error('Error saving auth state:', error)
-      return false
+function persistAuthState() {
+  if (state.user && state.accessToken) {
+    const payload = {
+      user: state.user,
+      accessToken: state.accessToken,
+      accessTokenExpiresAt: state.accessTokenExpiresAt,
     }
-  }
-
-  /**
-   * Clear authentication state
-   */
-  function clearAuthState() {
-    authState.value = {
-      isAuthenticated: false,
-      employee: null,
-      pin: null,
-      loginTime: null,
-      expiresAt: null
-    }
-    
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload))
+  } else {
     localStorage.removeItem(AUTH_STORAGE_KEY)
   }
+}
 
-  /**
-   * Clear remembered PIN
-   */
-  function clearRememberedPin() {
-    localStorage.removeItem(REMEMBER_PIN_KEY)
+function clearAuthState() {
+  state.user = null
+  state.accessToken = null
+  state.accessTokenExpiresAt = null
+  state.error = null
+  persistAuthState()
+}
+
+function hasValidAccessToken() {
+  if (!state.accessToken || !state.accessTokenExpiresAt) {
+    return false
   }
+  const now = Date.now()
+  return now < state.accessTokenExpiresAt - 5000 // renew slightly before expiry
+}
 
-  /**
-   * Set remembered PIN
-   */
-  function setRememberedPin(pin) {
-    try {
-      localStorage.setItem(REMEMBER_PIN_KEY, pin)
-      return true
-    } catch (error) {
-      console.error('Error saving remembered PIN:', error)
-      return false
-    }
-  }
-
-  /**
-   * Get remembered PIN
-   */
-  function getRememberedPin() {
-    try {
-      return localStorage.getItem(REMEMBER_PIN_KEY)
-    } catch (error) {
-      console.error('Error retrieving remembered PIN:', error)
-      return null
-    }
-  }
-
-  /**
-   * Login function - authenticates employee with PIN
-   */
-  async function login(pin, employeeData) {
-    try {
-      // Validate input
-      if (!pin || !/^\d{4}$/.test(pin)) {
-        throw new Error('Invalid PIN format')
-      }
-
-      if (!employeeData || !employeeData.name) {
-        throw new Error('Invalid employee data')
-      }
-
-      // Create auth data
-      const authData = {
-        pin: pin,
-        employee: employeeData,
-        loginTime: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
-      }
-
-      // Save auth state
-      const saved = saveAuthState(authData)
-      if (!saved) {
-        throw new Error('Failed to save authentication data')
-      }
-
-      return {
-        success: true,
-        employee: employeeData,
-        expiresAt: authData.expiresAt
-      }
-
-    } catch (error) {
-      console.error('Login error:', error)
-      return {
-        success: false,
-        error: error.message || 'Login failed'
-      }
-    }
-  }
-
-  /**
-   * Logout function - clears authentication state
-   */
-  function logout() {
+function setAuthData({ user, accessToken, expiresIn }) {
+  if (!accessToken) {
     clearAuthState()
-    
-    return {
-      success: true,
-      message: 'Logged out successfully'
-    }
+    return
   }
 
-  /**
-   * Check if user has access to specific route
-   */
-  function hasRouteAccess(routeName) {
-    switch (routeName) {
-      case 'EmployeePortal':
-      case 'employee':
-        return isAuthenticated.value
-      
-      default:
-        return true // Allow access to all other routes
+  state.user = user || state.user
+  state.accessToken = accessToken
+  state.accessTokenExpiresAt = Date.now() + (expiresIn * 1000)
+  state.error = null
+  state.initialized = true
+  persistAuthState()
+}
+
+function getAccessToken() {
+  ensureInitialized()
+  return hasValidAccessToken() ? state.accessToken : null
+}
+
+async function login(email, password) {
+  ensureInitialized()
+  state.loading = true
+  state.error = null
+
+  try {
+    const { data } = await axios.post(
+      `${API_BASE_URL}/auth/login`,
+      { email, password },
+      { withCredentials: true }
+    )
+
+    setAuthData({
+      user: data.user,
+      accessToken: data.accessToken,
+      expiresIn: data.accessTokenExpiresIn || 900,
+    })
+
+    return { success: true, user: data.user }
+  } catch (error) {
+    const message = error.response?.data?.message || 'Invalid email or password.'
+    state.error = message
+    clearAuthState()
+    return { success: false, message }
+  } finally {
+    state.loading = false
+  }
+}
+
+async function logout({ silent = false } = {}) {
+  ensureInitialized()
+
+  try {
+    await axios.post(`${API_BASE_URL}/auth/logout`, {}, { withCredentials: true })
+    return { success: true }
+  } catch (error) {
+    if (!silent) {
+      const message = error.response?.data?.message || 'Failed to log out.'
+      state.error = message
+      return { success: false, message }
     }
+    return { success: false }
+  } finally {
+    clearAuthState()
+  }
+}
+
+async function logoutSilently() {
+  await logout({ silent: true })
+}
+
+async function attemptTokenRefresh() {
+  ensureInitialized()
+
+  if (!state.user) {
+    return null
   }
 
-  /**
-   * Get session duration info
-   */
-  function getSessionInfo() {
-    if (!authState.value.loginTime || !authState.value.expiresAt) {
-      return null
-    }
-
-    const now = new Date()
-    const loginTime = new Date(authState.value.loginTime)
-    const expiresAt = new Date(authState.value.expiresAt)
-    
-    const totalDuration = expiresAt - loginTime
-    const remainingTime = expiresAt - now
-    const elapsedTime = now - loginTime
-    
-    return {
-      totalDuration: totalDuration,
-      remainingTime: remainingTime,
-      elapsedTime: elapsedTime,
-      remainingMinutes: Math.max(0, Math.floor(remainingTime / (1000 * 60))),
-      elapsedMinutes: Math.floor(elapsedTime / (1000 * 60)),
-      isExpired: isSessionExpired()
-    }
+  if (hasValidAccessToken()) {
+    return state.accessToken
   }
 
-  /**
-   * Extend session (refresh expiration time)
-   */
-  function extendSession(additionalHours = 24) {
-    if (!authState.value.isAuthenticated) {
-      return false
-    }
-
-    const newExpiresAt = new Date(Date.now() + (additionalHours * 60 * 60 * 1000))
-    
-    const updatedAuthData = {
-      ...authState.value,
-      expiresAt: newExpiresAt.toISOString()
-    }
-
-    return saveAuthState(updatedAuthData)
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true })
+      .then(({ data }) => {
+        const user = data.user || state.user
+        if (data.accessToken && user) {
+          setAuthData({
+            user,
+            accessToken: data.accessToken,
+            expiresIn: data.accessTokenExpiresIn || 900,
+          })
+          return data.accessToken
+        }
+        clearAuthState()
+        return null
+      })
+      .catch((error) => {
+        console.error('Token refresh failed:', error)
+        clearAuthState()
+        return null
+      })
+      .finally(() => {
+        refreshPromise = null
+      })
   }
 
-  /**
-   * Initialize authentication state on app load
-   */
-  function initializeAuth() {
-    return loadAuthState()
-  }
+  return refreshPromise
+}
 
-  /**
-   * Validate PIN format (client-side validation)
-   */
-  function validatePinFormat(pin) {
-    if (!pin) {
-      return { valid: false, error: 'PIN is required' }
-    }
-    
-    if (!/^\d{4}$/.test(pin)) {
-      return { valid: false, error: 'PIN must be exactly 4 digits' }
-    }
-    
-    return { valid: true }
-  }
+async function requestPasswordReset(email) {
+  return axios.post(`${API_BASE_URL}/auth/request-reset`, { email }, { withCredentials: true })
+}
 
+async function resetPassword(token, password) {
+  return axios.post(
+    `${API_BASE_URL}/auth/reset-password`,
+    { token, password },
+    { withCredentials: true }
+  )
+}
+
+async function initializeAuth() {
+  ensureInitialized()
+  if (state.user && !hasValidAccessToken()) {
+    await attemptTokenRefresh()
+  }
+  return isAuthenticated.value
+}
+
+const isAuthenticated = computed(() => {
+  ensureInitialized()
+  return hasValidAccessToken() && !!state.user
+})
+
+const authUser = computed(() => state.user)
+const authError = computed(() => state.error)
+const isLoading = computed(() => state.loading)
+const isInitialized = computed(() => state.initialized)
+
+export function useAuth() {
   return {
-    // State
     isAuthenticated,
-    getCurrentEmployee,
-    getCurrentPin,
-    
-    // Session management
-    isSessionExpired,
-    loadAuthState,
-    saveAuthState,
-    clearAuthState,
-    getSessionInfo,
-    extendSession,
-    initializeAuth,
-    
-    // Authentication methods
+    user: authUser,
+    isInitialized,
+    loading: isLoading,
+    error: authError,
     login,
-    logout,
-    hasRouteAccess,
-    validatePinFormat,
-    
-    // Remember me functionality
-    clearRememberedPin,
-    setRememberedPin,
-    getRememberedPin
+    logout: () => logout({ silent: false }),
+    logoutSilently,
+    initializeAuth,
+    requestPasswordReset,
+    resetPassword,
   }
+}
+
+export {
+  getAccessToken,
+  attemptTokenRefresh,
+  logoutSilently,
+  requestPasswordReset,
+  resetPassword,
+  initializeAuth,
 }

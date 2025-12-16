@@ -1,10 +1,13 @@
 <script setup>
 import { ref, provide, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
 import TripForm from './components/TripForm.vue'
 
 const router = useRouter()
 const route = useRoute()
+
+const adminAuth = useAuth()
 
 // Check if current route is employee-only
 const isEmployeeRoute = computed(() => {
@@ -150,6 +153,10 @@ const setActiveSectionMobile = (section) => {
           <v-icon size="16" start>mdi-cog</v-icon>
           <span class="d-none d-md-inline">Settings</span>
         </v-tab>
+        <v-tab to="/admin/user-management" class="nav-tab">
+          <v-icon size="16" start>mdi-account-group</v-icon>
+          <span class="d-none d-md-inline">User Management</span>
+        </v-tab>
       </v-tabs>
 
       <!-- Logo and Text - Rightmost position -->
@@ -257,6 +264,14 @@ const setActiveSectionMobile = (section) => {
         >
           <template #prepend><v-icon>mdi-cog</v-icon></template>
           <v-list-item-title>Settings</v-list-item-title>
+        </v-list-item>
+        <v-list-item
+          @click="setActiveSectionMobile('admin/user-management')"
+          value="user-management"
+          class="drawer-item"
+        >
+          <template #prepend><v-icon>mdi-account-group</v-icon></template>
+          <v-list-item-title>User Management</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>

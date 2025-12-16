@@ -174,9 +174,9 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import axios from 'axios'
+import axios from '@/api/httpClient'
 import { API_BASE_URL } from '@/api/config'
-import { useAuth } from '@/composables/useAuth'
+import { useEmployeeAuth } from '@/composables/useEmployeeAuth'
 import { useClientPayslipPDF } from '@/composables/useClientPayslipPDF'
 import PayslipPreview from '@/components/PayslipPreview.vue'
 
@@ -197,7 +197,7 @@ const viewModalOpen = ref(false)
 const selectedPayslip = ref(null)
 
 // Authentication
-const auth = useAuth()
+const auth = useEmployeeAuth()
 const sessionInfo = computed(() => auth.getSessionInfo())
 
 // Get PIN from route parameters

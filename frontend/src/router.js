@@ -11,26 +11,73 @@ import Maintenance from './components/Maintenance.vue'
 import Settings from './components/Settings.vue'
 import EmployeePortal from './views/EmployeePortal.vue'
 import LoginPortal from './views/LoginPortal.vue'
+import AdminLogin from './views/AdminLogin.vue'
+import AdminForgotPassword from './views/AdminForgotPassword.vue'
+import AdminResetPassword from './views/AdminResetPassword.vue'
+import UserManagement from './views/admin/UserManagement.vue'
 import { useAuth } from '@/composables/useAuth'
+import { useEmployeeAuth } from '@/composables/useEmployeeAuth'
 
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: DashboardCharts,
+    redirect: '/dashboard'
+  },
+  {
+    path: '/admin/login',
+    name: 'AdminLogin',
+    component: AdminLogin,
+    meta: {
+      title: 'Admin Login',
+      guestOnly: true,
+      hideShell: true,
+    },
+  },
+  {
+    path: '/admin/forgot-password',
+    name: 'AdminForgotPassword',
+    component: AdminForgotPassword,
+    meta: {
+      title: 'Forgot Password',
+      guestOnly: true,
+      hideShell: true,
+    },
+  },
+  {
+    path: '/admin/reset-password',
+    name: 'AdminResetPassword',
+    component: AdminResetPassword,
+    meta: {
+      title: 'Reset Password',
+      guestOnly: true,
+      hideShell: true,
+    },
+  },
+  {
+    path: '/admin/user-management',
+    name: 'UserManagement',
+    component: UserManagement,
+    meta: {
+      requiresAdminAuth: true,
+      title: 'User Management',
+    },
   },
   {
     path: '/dashboard',
     name: 'Dashboard',
     component: DashboardCharts,
+    meta: {
+      requiresAdminAuth: true,
+      title: 'Dashboard',
+    },
   },
   {
     path: '/login',
     name: 'Login',
     component: LoginPortal,
     meta: { 
-      requiresAuth: false,
-      title: 'Employee Login Portal'
+      title: 'Employee Login Portal',
+      hideShell: true,
     }
   },
   {
@@ -39,7 +86,7 @@ const routes = [
     component: EmployeePortal,
     props: true,
     meta: { 
-      requiresAuth: true,
+      requiresEmployeeAuth: true,
       title: 'Employee Portal',
       allowDirectAccess: true // Allow direct URL access for backward compatibility
     }
@@ -48,6 +95,10 @@ const routes = [
     path: '/payroll',
     name: 'Payroll',
     component: () => import('./views/PayrollLayout.vue'), // We'll create this wrapper
+    meta: {
+      requiresAdminAuth: true,
+      title: 'Payroll',
+    },
     children: [
       {
         path: '',
@@ -70,11 +121,19 @@ const routes = [
     path: '/trips',
     name: 'Trips',
     component: TripList,
+    meta: {
+      requiresAdminAuth: true,
+      title: 'Trips',
+    },
   },
   {
     path: '/billing',
     name: 'Billing',
     component: () => import('./views/BillingLayout.vue'), // We'll create this wrapper
+    meta: {
+      requiresAdminAuth: true,
+      title: 'Billing',
+    },
     children: [
       {
         path: '',
@@ -97,26 +156,50 @@ const routes = [
     path: '/tolls',
     name: 'Tolls',
     component: TollView,
+    meta: {
+      requiresAdminAuth: true,
+      title: 'Tolls',
+    },
   },
   {
     path: '/expenses',
     name: 'Expenses',
     component: ExpensesView,
+    meta: {
+      requiresAdminAuth: true,
+      title: 'Expenses',
+    },
   },
   {
     path: '/maintenance',
     name: 'Maintenance',
     component: Maintenance,
+    meta: {
+      requiresAdminAuth: true,
+      title: 'Maintenance',
+    },
   },
   {
     path: '/settings',
     name: 'Settings',
     component: Settings,
+    meta: {
+      requiresAdminAuth: true,
+      title: 'Settings',
+    },
   },
   {
     path: '/fuel',
     name: 'Fuel',
     component: () => import('./views/FuelView.vue'),
+    meta: {
+      requiresAdminAuth: true,
+      title: 'Fuel',
+    },
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/dashboard',
   },
 ]
 
@@ -127,59 +210,50 @@ const router = createRouter({
 
 // Authentication guards
 router.beforeEach(async (to, from, next) => {
-  const { initializeAuth, isAuthenticated } = useAuth()
-  
-  // Initialize authentication state
-  const authInitialized = initializeAuth()
+  const adminAuth = useAuth()
+  const employeeAuth = useEmployeeAuth()
   
   // Set page title
   if (to.meta.title) {
     document.title = `${to.meta.title} | MTM Enterprise`
   }
   
-  // Check if route requires authentication
-  if (to.meta.requiresAuth) {
-    // For employee portal, allow direct access but redirect if not authenticated
-    if (to.name === 'EmployeePortal') {
-      const auth = useAuth()
-      
-      if (auth.isAuthenticated.value) {
-        // User is authenticated, allow access
-        next()
-      } else if (to.meta.allowDirectAccess) {
-        // Allow direct access for backward compatibility
-        // Check if PIN matches current user session
-        const routePin = to.params.pin
-        
-        if (routePin && /^\d{4}$/.test(routePin)) {
-          // Allow direct access to employee portal with valid PIN
-          // The component itself will handle the authentication
-          next()
-        } else {
-          // Invalid PIN format, redirect to login
-          next('/login')
-        }
-      } else {
-        // Not authenticated and no direct access allowed, redirect to login
-        next('/login')
-      }
-    } else {
-      // Other protected routes
-      if (isAuthenticated.value) {
-        next()
-      } else {
-        // Redirect to login with return URL
-        next({
-          path: '/login',
-          query: { redirect: to.fullPath }
-        })
-      }
+  if (to.meta.requiresAdminAuth) {
+    await adminAuth.initializeAuth()
+    if (adminAuth.isAuthenticated.value) {
+      return next()
     }
-  } else {
-    // Route doesn't require authentication
-    // Allow access to login page even if authenticated - users can manually access it
-    next()
+    return next({
+      path: '/admin/login',
+      query: { redirect: to.fullPath },
+    })
   }
+
+  if (to.meta.requiresEmployeeAuth) {
+    employeeAuth.initializeAuth()
+    if (employeeAuth.isAuthenticated.value) {
+      return next()
+    }
+
+    if (to.meta.allowDirectAccess) {
+      return next()
+    }
+
+    return next({
+      path: '/login',
+      query: { redirect: to.fullPath },
+    })
+  }
+
+  if (to.meta.guestOnly) {
+    await adminAuth.initializeAuth()
+    if (adminAuth.isAuthenticated.value) {
+      const redirectTarget = typeof to.query.redirect === 'string' ? to.query.redirect : '/dashboard'
+      return next(redirectTarget)
+    }
+  }
+
+  next()
 })
 
 // Global after hook for navigation tracking

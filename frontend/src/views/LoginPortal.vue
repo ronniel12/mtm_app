@@ -104,13 +104,13 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import axios from '@/api/httpClient'
 import { API_BASE_URL } from '@/api/config'
-import { useAuth } from '@/composables/useAuth'
+import { useEmployeeAuth } from '@/composables/useEmployeeAuth'
 
 // Reactive data
 const router = useRouter()
-const auth = useAuth()
+const auth = useEmployeeAuth()
 const pin = ref('')
 const loading = ref(false)
 const errorMessage = ref('')

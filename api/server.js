@@ -1,3 +1,4 @@
+console.log('Server starting...');
 const express = require('express');
 const cors = require('cors');
 const serverless = require('serverless-http');
@@ -8,6 +9,13 @@ const NodeCache = require('node-cache');
 const multer = require('multer');
 const compression = require('compression');
 const { query } = require('./lib/db');
+const authService = require('./lib/auth-service');
+const { authenticateRequest, requireRoles } = require('./lib/auth-middleware');
+const {
+  extractRefreshToken,
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+} = require('./lib/auth-utils');
 const PDFService = require('./pdf-service');
 require('dotenv').config();
 
@@ -44,14 +52,6 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  }
-});
-
 // JSON parser middleware for PUT and POST routes
 const jsonParser = (req, res, next) => {
   if ((req.method === 'PUT' || req.method === 'POST') && req.headers['content-type']?.includes('application/json')) {
@@ -71,6 +71,226 @@ const jsonParser = (req, res, next) => {
     next();
   }
 };
+
+function getRequestMeta(req) {
+  const ipHeader = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || null;
+  const ipAddress = Array.isArray(ipHeader) ? ipHeader[0] : (ipHeader ? ipHeader.split(',')[0].trim() : null);
+  return {
+    userAgent: req.headers['user-agent'] || null,
+    ipAddress,
+  };
+}
+
+// Authentication endpoints
+app.post('/api/auth/login', jsonParser, async (req, res) => {
+  if (!authService.isAuthEnabled()) {
+    return res.status(501).json({ message: 'Authentication is not enabled for this deployment.' });
+  }
+
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required.' });
+  }
+
+  try {
+    const user = await authService.getUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    const isValid = await authService.verifyPassword(password, user.password_hash);
+    if (!isValid) {
+      return res.status(401).json({ message: 'Invalid credentials.' });
+    }
+
+    await authService.updateLastLogin(user.id);
+
+    const accessToken = authService.generateAccessToken(user);
+    const refreshToken = await authService.issueRefreshToken(user.id, getRequestMeta(req));
+    setRefreshTokenCookie(res, refreshToken);
+
+    const response = {
+      accessToken,
+      accessTokenExpiresIn: authService.getAccessTokenTTLSeconds(),
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+    };
+
+    if (process.env.AUTH_RETURN_REFRESH_IN_BODY === 'true') {
+      response.refreshToken = refreshToken;
+    }
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error('Error during login:', error);
+    return res.status(500).json({ message: 'Failed to login.' });
+  }
+});
+
+app.post('/api/auth/refresh', jsonParser, async (req, res) => {
+  if (!authService.isAuthEnabled()) {
+    return res.status(501).json({ message: 'Authentication is not enabled for this deployment.' });
+  }
+
+  try {
+    const refreshToken = extractRefreshToken(req);
+    const session = await authService.verifyRefreshToken(refreshToken);
+    if (!session) {
+      return res.status(401).json({ message: 'Invalid refresh token.' });
+    }
+
+    const user = await authService.getUserById(session.user_id);
+    if (!user) {
+      await authService.revokeSession(session.id);
+      return res.status(401).json({ message: 'Invalid refresh token.' });
+    }
+
+    // Rotate refresh token
+    await authService.revokeSession(session.id);
+    const newRefreshToken = await authService.issueRefreshToken(user.id, getRequestMeta(req));
+    setRefreshTokenCookie(res, newRefreshToken);
+
+    const response = {
+      accessToken: authService.generateAccessToken(user),
+      accessTokenExpiresIn: authService.getAccessTokenTTLSeconds(),
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+    };
+
+    if (process.env.AUTH_RETURN_REFRESH_IN_BODY === 'true') {
+      response.refreshToken = newRefreshToken;
+    }
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error('Error during token refresh:', error);
+    return res.status(500).json({ message: 'Failed to refresh token.' });
+  }
+});
+
+app.post('/api/auth/logout', jsonParser, async (req, res) => {
+  if (!authService.isAuthEnabled()) {
+    return res.status(200).json({ message: 'Authentication is not enabled.' });
+  }
+
+  try {
+    const refreshToken = extractRefreshToken(req);
+    if (refreshToken) {
+      await authService.revokeRefreshToken(refreshToken);
+    }
+    clearRefreshTokenCookie(res);
+    return res.status(204).send();
+  } catch (error) {
+    console.error('Error during logout:', error);
+    return res.status(500).json({ message: 'Failed to logout.' });
+  }
+});
+
+app.post('/api/auth/request-reset', jsonParser, async (req, res) => {
+  if (!authService.isAuthEnabled()) {
+    return res.status(501).json({ message: 'Authentication is not enabled for this deployment.' });
+  }
+
+  const { email } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required.' });
+  }
+
+  try {
+    const user = await authService.getUserByEmail(email);
+    if (user) {
+      const { token, expiresAt } = await authService.generatePasswordResetToken(user.id);
+
+      // TODO: integrate email delivery provider.
+      console.log('Password reset token generated', { email: user.email, token, expiresAt });
+
+      if (process.env.AUTH_DEBUG_RETURN_RESET_TOKEN === 'true') {
+        return res.status(200).json({ message: 'Password reset instructions sent.', resetToken: token, expiresAt });
+      }
+    }
+
+    return res.status(200).json({ message: 'Password reset instructions sent.' });
+  } catch (error) {
+    console.error('Error generating password reset token:', error);
+    return res.status(500).json({ message: 'Failed to process password reset request.' });
+  }
+});
+
+app.post('/api/auth/reset-password', jsonParser, async (req, res) => {
+  if (!authService.isAuthEnabled()) {
+    return res.status(501).json({ message: 'Authentication is not enabled for this deployment.' });
+  }
+
+  const { token, password } = req.body || {};
+  if (!token || !password) {
+    return res.status(400).json({ message: 'Reset token and new password are required.' });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
+  }
+
+  try {
+    const user = await authService.verifyPasswordResetToken(token);
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token.' });
+    }
+
+    const passwordHash = await authService.hashPassword(password);
+    await authService.setUserPassword(user.id, passwordHash);
+    await authService.revokeAllSessionsForUser(user.id);
+
+    return res.status(200).json({ message: 'Password has been reset successfully.' });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    return res.status(500).json({ message: 'Failed to reset password.' });
+  }
+});
+app.post('/api/admin/reset-password', jsonParser, authenticateRequest, requireRoles(['admin']), async (req, res) => {
+  const { userId, newPassword } = req.body;
+  if (!userId || !newPassword) {
+    return res.status(400).json({ message: 'userId and newPassword are required.' });
+  }
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
+  }
+
+  try {
+    await authService.resetUserPassword(req.user.id, userId, newPassword);
+    return res.status(200).json({ message: 'Password has been reset successfully.' });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    return res.status(500).json({ message: 'Failed to reset password.' });
+  }
+});
+
+// Apply authentication middleware for all subsequent routes when enabled
+app.use((req, res, next) => {
+  if (!authService.isAuthEnabled()) {
+    return next();
+  }
+
+  if (req.path.startsWith('/api/auth') || req.path.match(/^\/api\/expenses\/\d+\/receipt$/)) {
+    return next();
+  }
+
+  return authenticateRequest(req, res, next);
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
 
 // Copy all routes from original server.js
 // Trip suggestions API endpoint
@@ -2840,7 +3060,7 @@ app.delete('/api/rates/:origin/:province/:town', async (req, res) => {
 });
 
 // Expenses API endpoints
-app.get('/api/expenses', async (req, res) => {
+app.get('/api/expenses', authenticateRequest, async (req, res) => {
   try {
     console.log('🔍 GET /api/expenses - Fetching all expenses...')
 
@@ -2875,7 +3095,7 @@ app.get('/api/expenses', async (req, res) => {
   }
 });
 
-app.get('/api/expenses/:id', async (req, res) => {
+app.get('/api/expenses/:id', authenticateRequest, async (req, res) => {
   try {
     const result = await query('SELECT * FROM expenses WHERE id = $1', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -2903,7 +3123,7 @@ const uploadOptional = upload.fields([
 
 
 // Use regular JSON body parser for all expense routes (including creation)
-app.post('/api/expenses', async (req, res) => {
+app.post('/api/expenses', authenticateRequest, jsonParser, async (req, res) => {
   try {
     console.log('📦 Expense creation started - with file support');
     console.log('📋 Request headers:', {
@@ -3028,7 +3248,7 @@ app.post('/api/expenses', async (req, res) => {
   }
 });
 
-app.put('/api/expenses/:id', async (req, res) => {
+app.put('/api/expenses/:id', authenticateRequest, jsonParser, async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -3067,7 +3287,7 @@ app.put('/api/expenses/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/expenses/:id', async (req, res) => {
+app.delete('/api/expenses/:id', authenticateRequest, async (req, res) => {
   try {
     const result = await query('DELETE FROM expenses WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -3081,8 +3301,8 @@ app.delete('/api/expenses/:id', async (req, res) => {
   }
 });
 
-    // Download expense receipt
-    app.get('/api/expenses/:id/receipt', async (req, res) => {
+// Download expense receipt
+app.get('/api/expenses/:id/receipt', async (req, res) => {
       try {
         const result = await query('SELECT receipt_data, receipt_original_name, receipt_mimetype FROM expenses WHERE id = $1', [parseInt(req.params.id)]);
 
@@ -4250,7 +4470,88 @@ app.post('/api/test/pdf', async (req, res) => {
   }
 });
 
+// Admin API endpoints
+app.get('/api/admin/users', authenticateRequest, requireRoles('admin'), async (req, res) => {
+  try {
+    const result = await query('SELECT id, email, role, last_login FROM users ORDER BY email ASC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+app.post('/api/admin/users', jsonParser, authenticateRequest, requireRoles(['admin']), async (req, res) => {
+  const { email, password, role } = req.body || {};
+  if (!email || !password || !role) {
+    return res.status(400).json({ message: 'Email, password, and role are required.' });
+  }
+
+  try {
+    const user = await authService.createUser(email, password, role);
+    return res.status(201).json(user);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    if (error.message === 'Email already exists' || error.message === 'Invalid role' || error.message === 'Password must be at least 8 characters') {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Failed to create user.' });
+  }
+});
+
+app.put('/api/admin/users/:id', jsonParser, authenticateRequest, requireRoles(['admin']), async (req, res) => {
+  console.log('Route hit for PUT /api/admin/users/:id');
+  const { id } = req.params;
+  const { email, role, password } = req.body || {};
+
+  console.log('PUT /api/admin/users/:id called with id:', id, 'body:', req.body);
+
+  if (!id) {
+    console.log('User ID is required');
+    return res.status(400).json({ message: 'User ID is required.' });
+  }
+
+  try {
+    const user = await authService.updateUser(id, { email, role, password });
+    console.log('User updated successfully:', user);
+    return res.status(200).json(user);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    if (error.message === 'User not found' || error.message === 'Email already exists' || error.message === 'Invalid role' || error.message === 'Password must be at least 8 characters' || error.message === 'No valid fields to update') {
+      return res.status(400).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Failed to update user.' });
+  }
+});
+
+app.delete('/api/admin/users/:id', authenticateRequest, requireRoles(['admin']), async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ message: 'User ID is required.' });
+  }
+
+  try {
+    await authService.deleteUser(id);
+    return res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    if (error.message === 'User not found') {
+      return res.status(404).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Failed to delete user.' });
+  }
+});
+
 // ============================================================================
 // Export the serverless handler
 module.exports = app;
 module.exports.handler = serverless(app);
+
+// For local development
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+}

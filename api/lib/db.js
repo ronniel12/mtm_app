@@ -15,6 +15,7 @@ const pool = new Pool({
   maxUses: 7500, // Reset connections periodically
   timezone: 'UTC', // Force UTC timezone to prevent date conversion issues
   allowExitOnIdle: true, // Allow exiting when idle in serverless
+  prepare: false, // Disable prepared statements to prevent conflicts
 });
 
 // Test the connection
@@ -27,13 +28,16 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
+let queryCounter = 0;
+
 // Query helper function
 const query = async (text, params) => {
   const start = Date.now();
   try {
-    const res = await pool.query(text, params);
+    const name = `query_${queryCounter++}`;
+    const res = await pool.query({ text, values: params, name: null });
     const duration = Date.now() - start;
-    console.log('Executed query', { text, duration, rows: res.rowCount });
+    console.log('Executed query', { duration, rows: res.rowCount });
     return res;
   } catch (err) {
     console.error('Query error:', err);

@@ -1,6 +1,0 @@
-warning: in the working copy of 'node_modules/.bin/vc', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'node_modules/.bin/vc.ps1', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'node_modules/.bin/vercel', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'node_modules/.bin/vercel.ps1', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'node_modules/@edge-runtime/format/package.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'node_modules/@edge-runtime/node-utils/dist/index.d.ts', LF will be replaced by CRLF the next time Git touches it
