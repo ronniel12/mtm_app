@@ -5,7 +5,7 @@
 // In development (Vercel dev), use relative API path
 // In local development, use localhost or configured URL
 export const API_BASE_URL = import.meta.env.PROD
-  ? '/api'  // Production: relative path to Vercel domain
+  ? '/'  // Production: root path, Vercel routes /api/* to serverless functions
   : (import.meta.env.VITE_API_BASE_URL || '/api')  // Development: relative path for Vercel dev
 
 // API endpoints
