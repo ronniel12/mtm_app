@@ -2,7 +2,7 @@ import axios from 'axios'
 import { API_BASE_URL } from './config'
 import { getAccessToken, attemptTokenRefresh, logoutSilently } from '@/composables/useAuth'
 
-axios.defaults.baseURL = API_BASE_URL
+
 axios.defaults.withCredentials = true
 
 let isRefreshing = false
