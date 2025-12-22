@@ -9,6 +9,11 @@ const route = useRoute()
 
 const adminAuth = useAuth()
 
+// Check if user is a manager
+const isManager = computed(() => {
+  return adminAuth.user.value?.role === 'manager'
+})
+
 // Check if current route is employee-only
 const isEmployeeRoute = computed(() => {
   return route.path && route.path.startsWith('/employee/')
@@ -149,11 +154,11 @@ const setActiveSectionMobile = (section) => {
           <v-icon size="16" start>mdi-wrench</v-icon>
           <span class="d-none d-md-inline">Maintenance</span>
         </v-tab>
-        <v-tab to="/settings" class="nav-tab">
+        <v-tab v-if="!isManager" to="/settings" class="nav-tab">
           <v-icon size="16" start>mdi-cog</v-icon>
           <span class="d-none d-md-inline">Settings</span>
         </v-tab>
-        <v-tab to="/admin/user-management" class="nav-tab">
+        <v-tab v-if="!isManager" to="/admin/user-management" class="nav-tab">
           <v-icon size="16" start>mdi-account-group</v-icon>
           <span class="d-none d-md-inline">User Management</span>
         </v-tab>
@@ -234,6 +239,7 @@ const setActiveSectionMobile = (section) => {
           <v-list-item-title>Tolls</v-list-item-title>
         </v-list-item>
         <v-list-item
+
           @click="setActiveSectionMobile('fuel')"
           value="fuel"
           class="drawer-item"
@@ -258,6 +264,7 @@ const setActiveSectionMobile = (section) => {
           <v-list-item-title>Maintenance</v-list-item-title>
         </v-list-item>
         <v-list-item
+          v-if="!isManager"
           @click="setActiveSectionMobile('settings')"
           value="settings"
           class="drawer-item"
@@ -266,6 +273,7 @@ const setActiveSectionMobile = (section) => {
           <v-list-item-title>Settings</v-list-item-title>
         </v-list-item>
         <v-list-item
+          v-if="!isManager"
           @click="setActiveSectionMobile('admin/user-management')"
           value="user-management"
           class="drawer-item"

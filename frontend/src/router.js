@@ -208,6 +208,17 @@ const router = createRouter({
   routes,
 })
 
+// Helper functions for route permissions
+function isManagerAllowed(path) {
+  const managerRoutes = ['/dashboard', '/payroll', '/trips', '/billing', '/tolls', '/expenses', '/maintenance']
+  return managerRoutes.some(route => path.startsWith(route))
+}
+
+function isAdminOnly(path) {
+  const adminRoutes = ['/settings', '/admin/user-management']
+  return adminRoutes.some(route => path.startsWith(route))
+}
+
 // Authentication guards
 router.beforeEach(async (to, from, next) => {
   const adminAuth = useAuth()
@@ -220,13 +231,30 @@ router.beforeEach(async (to, from, next) => {
   
   if (to.meta.requiresAdminAuth) {
     await adminAuth.initializeAuth()
-    if (adminAuth.isAuthenticated.value) {
+    if (!adminAuth.isAuthenticated.value) {
+      return next({
+        path: '/admin/login',
+        query: { redirect: to.fullPath },
+      })
+    }
+
+    // User is authenticated, check role-based permissions
+    const userRole = adminAuth.user.value.role
+
+    if (isAdminOnly(to.path)) {
+      if (userRole === 'admin') {
+        return next()
+      } else {
+        // Manager trying to access admin-only route, redirect to dashboard
+        return next('/dashboard')
+      }
+    } else if (isManagerAllowed(to.path)) {
+      // Allow authenticated users (including managers) to access these routes
+      return next()
+    } else {
+      // For any other routes with requiresAdminAuth, allow if authenticated
       return next()
     }
-    return next({
-      path: '/admin/login',
-      query: { redirect: to.fullPath },
-    })
   }
 
   if (to.meta.requiresEmployeeAuth) {
