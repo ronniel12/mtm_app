@@ -4473,7 +4473,10 @@ app.post('/api/test/pdf', async (req, res) => {
 // Admin API endpoints
 app.get('/api/admin/users', authenticateRequest, requireRoles('admin'), async (req, res) => {
   try {
+    console.error('Starting GET /api/admin/users handler');
+    console.error('About to execute database query for users');
     const result = await query('SELECT id, email, role, last_login FROM users ORDER BY email ASC');
+    console.error('Database query executed, result:', result.rows.length, 'users');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching users:', error);

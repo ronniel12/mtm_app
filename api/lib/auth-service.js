@@ -152,8 +152,8 @@ async function createUser(email, password, role) {
 
   const passwordHash = await hashPassword(password);
   const { rows } = await query(
-    'INSERT INTO users (email, username, password_hash, role, full_name) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, role',
-    [email.toLowerCase(), email.toLowerCase(), passwordHash, role, email.toLowerCase()]
+    'INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role',
+    [email.toLowerCase(), passwordHash, role]
   );
 
   return rows[0];

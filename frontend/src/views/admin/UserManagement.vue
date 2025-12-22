@@ -18,9 +18,9 @@
       <!-- Card-based layout -->
       <div class="cards-container block">
         <div v-for="user in users" :key="user.id" class="user-card">
-          <div class="card-field"><strong>ID:</strong> {{ user.id }}</div>
-          <div class="card-field"><strong>Email:</strong> {{ user.email }}</div>
-          <div class="card-field"><strong>Role:</strong> {{ user.role }}</div>
+          <div class="card-field"><strong>ID:</strong> {{ user.id || 'N/A' }}</div>
+          <div class="card-field"><strong>Email:</strong> {{ user.email || 'N/A' }}</div>
+          <div class="card-field"><strong>Role:</strong> {{ user.role || 'N/A' }}</div>
           <div class="card-field"><strong>Last Login:</strong> {{ user.last_login ? new Date(user.last_login).toLocaleString() : 'Never' }}</div>
           <div class="card-actions">
             <button @click="openEditModal(user)" class="edit-btn card-edit-btn">✏️ Edit</button>
@@ -180,7 +180,9 @@ const isAdmin = computed(() => user.value && user.value.role === 'admin')
 const loadUsers = async () => {
   try {
     const response = await httpClient.get('/admin/users')
-    users.value = response.data
+    console.log('API response data:', response.data)
+users.value = response.data
+console.log('Users array:', users.value)
   } catch (err) {
     console.error('Failed to load users:', err)
     error.value = 'Failed to load users. Please try again.'
