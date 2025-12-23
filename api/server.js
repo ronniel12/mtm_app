@@ -82,7 +82,7 @@ function getRequestMeta(req) {
 }
 
 // Authentication endpoints
-app.post('/auth/login', jsonParser, async (req, res) => {
+app.post('/api/auth/login', jsonParser, async (req, res) => {
   if (!authService.isAuthEnabled()) {
     return res.status(501).json({ message: 'Authentication is not enabled for this deployment.' });
   }
@@ -130,7 +130,7 @@ app.post('/auth/login', jsonParser, async (req, res) => {
   }
 });
 
-app.post('/'auth/refresh', jsonParser, async (req, res) => {
+app.post('/api/auth/refresh', jsonParser, async (req, res) => {
   if (!authService.isAuthEnabled()) {
     return res.status(501).json({ message: 'Authentication is not enabled for this deployment.' });
   }
@@ -174,7 +174,7 @@ app.post('/'auth/refresh', jsonParser, async (req, res) => {
   }
 });
 
-app.post('/'auth/logout', jsonParser, async (req, res) => {
+app.post('/api/auth/logout', jsonParser, async (req, res) => {
   if (!authService.isAuthEnabled()) {
     return res.status(200).json({ message: 'Authentication is not enabled.' });
   }
@@ -192,7 +192,7 @@ app.post('/'auth/logout', jsonParser, async (req, res) => {
   }
 });
 
-app.post('/'auth/request-reset', jsonParser, async (req, res) => {
+app.post('/api/auth/request-reset', jsonParser, async (req, res) => {
   if (!authService.isAuthEnabled()) {
     return res.status(501).json({ message: 'Authentication is not enabled for this deployment.' });
   }
@@ -222,7 +222,7 @@ app.post('/'auth/request-reset', jsonParser, async (req, res) => {
   }
 });
 
-app.post('/'auth/reset-password', jsonParser, async (req, res) => {
+app.post('/api/auth/reset-password', jsonParser, async (req, res) => {
   if (!authService.isAuthEnabled()) {
     return res.status(501).json({ message: 'Authentication is not enabled for this deployment.' });
   }
@@ -252,7 +252,7 @@ app.post('/'auth/reset-password', jsonParser, async (req, res) => {
     return res.status(500).json({ message: 'Failed to reset password.' });
   }
 });
-app.post('/'admin/reset-password', jsonParser, authenticateRequest, requireRoles(['admin']), async (req, res) => {
+app.post('/api/admin/reset-password', jsonParser, authenticateRequest, requireRoles(['admin']), async (req, res) => {
   const { userId, newPassword } = req.body;
   if (!userId || !newPassword) {
     return res.status(400).json({ message: 'userId and newPassword are required.' });
@@ -277,7 +277,7 @@ app.use((req, res, next) => {
     return next();
   }
 
-  if (req.path.startsWith('/auth') || req.path.match(/^\/expenses\/\d+\/receipt$/)) {
+  if (req.path.startsWith('/api/auth') || req.path.match(/^\/api\/expenses\/\d+\/receipt$/)) {
     return next();
   }
 
@@ -294,7 +294,7 @@ const upload = multer({
 
 // Copy all routes from original server.js
 // Trip suggestions API endpoint
-app.get('/'trips/suggestions', async (req, res) => {
+app.get('/api/trips/suggestions', async (req, res) => {
   try {
     // Extract unique farm suggestions from trips data
     const result = await query('SELECT farm_name, destination, full_destination FROM trips WHERE farm_name IS NOT NULL AND farm_name != \'\'');
@@ -356,7 +356,7 @@ app.get('/'trips/suggestions', async (req, res) => {
 
 // All routes from your original server.js
 
-app.get('/'trips', async (req, res) => {
+app.get('/api/trips', async (req, res) => {
   try {
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
@@ -681,7 +681,7 @@ function parseDateQuery(searchQuery) {
 }
 
 // Optimized trips endpoint with pre-calculated rates and search
-app.get('/'trips/calculated', async (req, res) => {
+app.get('/api/trips/calculated', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limitParam = req.query.limit;
@@ -940,7 +940,7 @@ app.get('/'trips/calculated', async (req, res) => {
 });
 
 // Add all routes from your original server.js here
-app.get('/'trips/:id', async (req, res) => {
+app.get('/api/trips/:id', async (req, res) => {
   try {
     const result = await query('SELECT * FROM trips WHERE id = $1', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -980,7 +980,7 @@ app.get('/'trips/:id', async (req, res) => {
 });
 
 // Continue copying all other routes from your original server.js
-app.post('/'trips', jsonParser, async (req, res) => {
+app.post('/api/trips', jsonParser, async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body || {};
@@ -1060,7 +1060,7 @@ app.post('/'trips', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/'trips/:id', jsonParser, async (req, res) => {
+app.put('/api/trips/:id', jsonParser, async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body || {};
@@ -1136,7 +1136,7 @@ app.put('/'trips/:id', jsonParser, async (req, res) => {
   }
 });
 
-app.delete('/'trips/:id', async (req, res) => {
+app.delete('/api/trips/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM trips WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -1151,7 +1151,7 @@ app.delete('/'trips/:id', async (req, res) => {
 });
 
 // Rates API endpoints - supports both destination and town fields for backward compatibility
-app.get('/'rates', async (req, res) => {
+app.get('/api/rates', async (req, res) => {
   try {
     const { origin, province, destination, town } = req.query;
     const searchTerm = destination || town;
@@ -1198,7 +1198,7 @@ app.get('/'rates', async (req, res) => {
   }
 });
 
-app.get('/'rates/search', async (req, res) => {
+app.get('/api/rates/search', async (req, res) => {
   try {
     const { query: searchQuery } = req.query;
 
@@ -1223,7 +1223,7 @@ app.get('/'rates/search', async (req, res) => {
 });
 
 // Employee API endpoints
-app.get('/'employees', async (req, res) => {
+app.get('/api/employees', async (req, res) => {
   try {
     // Check cache first
     const cacheKey = 'employees:all';
@@ -1244,7 +1244,7 @@ app.get('/'employees', async (req, res) => {
   }
 });
 
-app.get('/'employees/:uuid', async (req, res) => {
+app.get('/api/employees/:uuid', async (req, res) => {
   try {
     const result = await query('SELECT * FROM employees WHERE uuid = $1', [req.params.uuid]);
     if (result.rows.length === 0) {
@@ -1257,7 +1257,7 @@ app.get('/'employees/:uuid', async (req, res) => {
   }
 });
 
-app.post('/'employees', jsonParser, async (req, res) => {
+app.post('/api/employees', jsonParser, async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -1313,7 +1313,7 @@ app.post('/'employees', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/'employees/:uuid', jsonParser, async (req, res) => {
+app.put('/api/employees/:uuid', jsonParser, async (req, res) => {
   try {
     // Body is parsed by jsonParser middleware
     const body = req.body;
@@ -1358,7 +1358,7 @@ app.put('/'employees/:uuid', jsonParser, async (req, res) => {
 });
 
 // Employee PIN management endpoints
-app.put('/'employees/:uuid/pin', async (req, res) => {
+app.put('/api/employees/:uuid/pin', async (req, res) => {
   try {
     const { pin } = req.body;
 
@@ -1396,7 +1396,7 @@ app.put('/'employees/:uuid/pin', async (req, res) => {
 });
 
 // Employee payslips access via PIN
-app.get('/'employee/:pin/payslips', async (req, res) => {
+app.get('/api/employee/:pin/payslips', async (req, res) => {
   try {
     const { pin } = req.params;
 
@@ -1532,7 +1532,7 @@ app.get('/'employee/:pin/payslips', async (req, res) => {
   }
 });
 
-app.delete('/'employees/:uuid', async (req, res) => {
+app.delete('/api/employees/:uuid', async (req, res) => {
   try {
     const result = await query('DELETE FROM employees WHERE uuid = $1 RETURNING *', [req.params.uuid]);
     if (result.rows.length === 0) {
@@ -1547,7 +1547,7 @@ app.delete('/'employees/:uuid', async (req, res) => {
 });
 
 // Deductions API endpoints
-app.get('/'deductions', async (req, res) => {
+app.get('/api/deductions', async (req, res) => {
   try {
     const result = await query('SELECT * FROM deductions ORDER BY created_at DESC');
     res.json(result.rows);
@@ -1579,7 +1579,7 @@ function parseDeductionId(idParam) {
   return { type: 'string', value: idParam };
 }
 
-app.get('/'deductions/:id', async (req, res) => {
+app.get('/api/deductions/:id', async (req, res) => {
   try {
     const result = await query('SELECT * FROM deductions WHERE id = $1', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -1592,7 +1592,7 @@ app.get('/'deductions/:id', async (req, res) => {
   }
 });
 
-app.post('/'deductions', jsonParser, async (req, res) => {
+app.post('/api/deductions', jsonParser, async (req, res) => {
   try {
     console.log('🔍 POST /api/deductions - Request body:', JSON.stringify(req.body, null, 2));
 
@@ -1652,7 +1652,7 @@ app.post('/'deductions', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/'deductions/:id', jsonParser, async (req, res) => {
+app.put('/api/deductions/:id', jsonParser, async (req, res) => {
   try {
     console.log('🔍 PUT /api/deductions - Request body:', JSON.stringify(req.body, null, 2));
     console.log('🔍 PUT /api/deductions - ID:', req.params.id);
@@ -1755,7 +1755,7 @@ app.put('/'deductions/:id', jsonParser, async (req, res) => {
   }
 });
 
-app.delete('/'deductions/:id', async (req, res) => {
+app.delete('/api/deductions/:id', async (req, res) => {
   try {
     console.log('🗑️ DELETE /api/deductions - ID parameter:', req.params.id);
 
@@ -1850,7 +1850,7 @@ app.delete('/'deductions/:id', async (req, res) => {
   }
 });
 
-app.get('/'employee-deduction-configs', async (req, res) => {
+app.get('/api/employee-deduction-configs', async (req, res) => {
   try {
     const { employee_uuid, deduction_id } = req.query;
     let queryStr = 'SELECT * FROM employee_deduction_configs WHERE 1=1';
@@ -1879,7 +1879,7 @@ app.get('/'employee-deduction-configs', async (req, res) => {
   }
 });
 
-app.get('/'employee-deduction-configs/:employee_uuid/:deduction_id', async (req, res) => {
+app.get('/api/employee-deduction-configs/:employee_uuid/:deduction_id', async (req, res) => {
   try {
     const result = await query(
       'SELECT * FROM employee_deduction_configs WHERE employee_uuid = $1 AND deduction_id = $2',
@@ -1907,7 +1907,7 @@ app.get('/'employee-deduction-configs/:employee_uuid/:deduction_id', async (req,
   }
 });
 
-app.post('/'employee-deduction-configs', async (req, res) => {
+app.post('/api/employee-deduction-configs', async (req, res) => {
   try {
     const body = req.body;
 
@@ -1943,7 +1943,7 @@ app.post('/'employee-deduction-configs', async (req, res) => {
   }
 });
 
-app.put('/'employee-deduction-configs/:employee_uuid/:deduction_id', async (req, res) => {
+app.put('/api/employee-deduction-configs/:employee_uuid/:deduction_id', async (req, res) => {
   try {
     const body = req.body;
 
@@ -1984,7 +1984,7 @@ app.put('/'employee-deduction-configs/:employee_uuid/:deduction_id', async (req,
   }
 });
 
-app.delete('/'employee-deduction-configs/:employee_uuid/:deduction_id', async (req, res) => {
+app.delete('/api/employee-deduction-configs/:employee_uuid/:deduction_id', async (req, res) => {
   try {
     const result = await query(
       'DELETE FROM employee_deduction_configs WHERE employee_uuid = $1 AND deduction_id = $2 RETURNING *',
@@ -2002,7 +2002,7 @@ app.delete('/'employee-deduction-configs/:employee_uuid/:deduction_id', async (r
 });
 
 // Helper endpoint to get matrix data for UI (employees × deductions with configs)
-app.get('/'employee-deduction-configs/matrix', async (req, res) => {
+app.get('/api/employee-deduction-configs/matrix', async (req, res) => {
   try {
     // Get all employees - sort by name for consistent ordering
     const employeesResult = await query('SELECT uuid, name FROM employees ORDER BY name');
@@ -2053,7 +2053,7 @@ app.get('/'employee-deduction-configs/matrix', async (req, res) => {
 });
 
 // Drivers API endpoints
-app.get('/'drivers', async (req, res) => {
+app.get('/api/drivers', async (req, res) => {
   try {
     const result = await query('SELECT * FROM drivers ORDER BY created_at DESC');
     res.json(result.rows);
@@ -2063,7 +2063,7 @@ app.get('/'drivers', async (req, res) => {
   }
 });
 
-app.post('/'drivers', async (req, res) => {
+app.post('/api/drivers', async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -2099,7 +2099,7 @@ app.post('/'drivers', async (req, res) => {
   }
 });
 
-app.put('/'drivers/:id', jsonParser, async (req, res) => {
+app.put('/api/drivers/:id', jsonParser, async (req, res) => {
   try {
     // Body is parsed by jsonParser middleware
     const body = req.body;
@@ -2127,7 +2127,7 @@ app.put('/'drivers/:id', jsonParser, async (req, res) => {
   }
 });
 
-app.delete('/'drivers/:id', async (req, res) => {
+app.delete('/api/drivers/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM drivers WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -2141,7 +2141,7 @@ app.delete('/'drivers/:id', async (req, res) => {
 });
 
 // Helpers API endpoints
-app.get('/'helpers', async (req, res) => {
+app.get('/api/helpers', async (req, res) => {
   try {
     const result = await query('SELECT * FROM helpers ORDER BY created_at DESC');
     res.json(result.rows);
@@ -2151,7 +2151,7 @@ app.get('/'helpers', async (req, res) => {
   }
 });
 
-app.post('/'helpers', async (req, res) => {
+app.post('/api/helpers', async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -2187,7 +2187,7 @@ app.post('/'helpers', async (req, res) => {
   }
 });
 
-app.put('/'helpers/:id', async (req, res) => {
+app.put('/api/helpers/:id', async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -2215,7 +2215,7 @@ app.put('/'helpers/:id', async (req, res) => {
   }
 });
 
-app.delete('/'helpers/:id', async (req, res) => {
+app.delete('/api/helpers/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM helpers WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -2229,7 +2229,7 @@ app.delete('/'helpers/:id', async (req, res) => {
 });
 
 // Payslips API endpoints
-app.get('/'payslips', async (req, res) => {
+app.get('/api/payslips', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -2262,7 +2262,7 @@ app.get('/'payslips', async (req, res) => {
   }
 });
 
-app.get('/'payslips/:id', async (req, res) => {
+app.get('/api/payslips/:id', async (req, res) => {
   try {
     const result = await query('SELECT * FROM payslips WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
@@ -2276,7 +2276,7 @@ app.get('/'payslips/:id', async (req, res) => {
 });
 
 // PDF download endpoint for payslips
-app.get('/'payslips/:id/download', async (req, res) => {
+app.get('/api/payslips/:id/download', async (req, res) => {
   try {
     const result = await query('SELECT details FROM payslips WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
@@ -2305,7 +2305,7 @@ app.get('/'payslips/:id/download', async (req, res) => {
   }
 });
 
-app.post('/'payslips', async (req, res) => {
+app.post('/api/payslips', async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -2367,7 +2367,7 @@ app.post('/'payslips', async (req, res) => {
   }
 });
 
-app.put('/'payslips/:id', async (req, res) => {
+app.put('/api/payslips/:id', async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -2408,7 +2408,7 @@ app.put('/'payslips/:id', async (req, res) => {
   }
 });
 
-app.delete('/'payslips/:id', async (req, res) => {
+app.delete('/api/payslips/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM payslips WHERE id = $1 RETURNING *', [req.params.id]);
     if (result.rows.length === 0) {
@@ -2423,7 +2423,7 @@ app.delete('/'payslips/:id', async (req, res) => {
 });
 
 // Generate PDF for employee payslips on-demand
-app.post('/'payslips/generate-pdf', async (req, res) => {
+app.post('/api/payslips/generate-pdf', async (req, res) => {
   try {
     const payslipData = req.body;
 
@@ -2510,7 +2510,7 @@ app.post('/'payslips/generate-pdf', async (req, res) => {
 });
 
 // Billings API endpoints
-app.get('/'billings', async (req, res) => {
+app.get('/api/billings', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -2573,7 +2573,7 @@ app.get('/'billings', async (req, res) => {
   }
 });
 
-app.get('/'billings/:id', async (req, res) => {
+app.get('/api/billings/:id', async (req, res) => {
   try {
     const result = await query('SELECT * FROM billings WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
@@ -2586,7 +2586,7 @@ app.get('/'billings/:id', async (req, res) => {
   }
 });
 
-app.post('/'billings', async (req, res) => {
+app.post('/api/billings', async (req, res) => {
   try {
     // Serverless environments need raw body parsing
     let body;
@@ -2695,7 +2695,7 @@ app.post('/'billings', async (req, res) => {
   }
 });
 
-app.put('/'billings/:id', async (req, res) => {
+app.put('/api/billings/:id', async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -2751,7 +2751,7 @@ app.put('/'billings/:id', async (req, res) => {
   }
 });
 
-app.delete('/'billings/:id', async (req, res) => {
+app.delete('/api/billings/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM billings WHERE id = $1 RETURNING *', [req.params.id]);
     if (result.rows.length === 0) {
@@ -2766,7 +2766,7 @@ app.delete('/'billings/:id', async (req, res) => {
 });
 
 // PDF download endpoint for billings - Note: Billings don't permanently store PDF URLs
-app.get('/'billings/:id/download', async (req, res) => {
+app.get('/api/billings/:id/download', async (req, res) => {
   try {
     const result = await query('SELECT billing_number FROM billings WHERE id = $1', [req.params.id]);
     if (result.rows.length === 0) {
@@ -2796,7 +2796,7 @@ app.get('/'billings/:id/download', async (req, res) => {
 });
 
 // Vehicles API endpoints
-app.get('/'vehicles', async (req, res) => {
+app.get('/api/vehicles', async (req, res) => {
   try {
     const result = await query('SELECT * FROM vehicles ORDER BY created_at DESC');
     res.json(result.rows);
@@ -2806,7 +2806,7 @@ app.get('/'vehicles', async (req, res) => {
   }
 });
 
-app.get('/'vehicles/:id', async (req, res) => {
+app.get('/api/vehicles/:id', async (req, res) => {
   try {
     const result = await query('SELECT * FROM vehicles WHERE id = $1', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -2819,7 +2819,7 @@ app.get('/'vehicles/:id', async (req, res) => {
   }
 });
 
-app.post('/'vehicles', jsonParser, async (req, res) => {
+app.post('/api/vehicles', jsonParser, async (req, res) => {
   try {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ error: 'Request body is required' });
@@ -2858,7 +2858,7 @@ app.post('/'vehicles', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/'vehicles/:id', jsonParser, async (req, res) => {
+app.put('/api/vehicles/:id', jsonParser, async (req, res) => {
   try {
     const body = req.body || {};
 
@@ -2902,7 +2902,7 @@ app.put('/'vehicles/:id', jsonParser, async (req, res) => {
   }
 });
 
-app.delete('/'vehicles/:id', async (req, res) => {
+app.delete('/api/vehicles/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM vehicles WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -2918,7 +2918,7 @@ app.delete('/'vehicles/:id', async (req, res) => {
 });
 
 // Rates API endpoints
-app.post('/'rates', jsonParser, async (req, res) => {
+app.post('/api/rates', jsonParser, async (req, res) => {
   try {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ error: 'Request body is required to create a rate.' });
@@ -2966,7 +2966,7 @@ app.post('/'rates', jsonParser, async (req, res) => {
   }
 });
 
-app.put('/'rates/:origin/:province/:town', jsonParser, async (req, res) => {
+app.put('/api/rates/:origin/:province/:town', jsonParser, async (req, res) => {
   try {
     const { originalOrigin, originalProvince, originalTown, ...updateData } = req.body;
 
@@ -3025,7 +3025,7 @@ app.put('/'rates/:origin/:province/:town', jsonParser, async (req, res) => {
   }
 });
 
-app.delete('/'rates/:origin/:province/:town', async (req, res) => {
+app.delete('/api/rates/:origin/:province/:town', async (req, res) => {
   try {
     // Decode URL parameters properly
     const originWhere = decodeURIComponent(req.params.origin || '').trim();
@@ -3060,7 +3060,7 @@ app.delete('/'rates/:origin/:province/:town', async (req, res) => {
 });
 
 // Expenses API endpoints
-app.get('/'expenses', authenticateRequest, async (req, res) => {
+app.get('/api/expenses', authenticateRequest, async (req, res) => {
   try {
     console.log('🔍 GET /api/expenses - Fetching all expenses...')
 
@@ -3095,7 +3095,7 @@ app.get('/'expenses', authenticateRequest, async (req, res) => {
   }
 });
 
-app.get('/'expenses/:id', authenticateRequest, async (req, res) => {
+app.get('/api/expenses/:id', authenticateRequest, async (req, res) => {
   try {
     const result = await query('SELECT * FROM expenses WHERE id = $1', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -3123,7 +3123,7 @@ const uploadOptional = upload.fields([
 
 
 // Use regular JSON body parser for all expense routes (including creation)
-app.post('/'expenses', authenticateRequest, jsonParser, async (req, res) => {
+app.post('/api/expenses', authenticateRequest, jsonParser, async (req, res) => {
   try {
     console.log('📦 Expense creation started - with file support');
     console.log('📋 Request headers:', {
@@ -3248,7 +3248,7 @@ app.post('/'expenses', authenticateRequest, jsonParser, async (req, res) => {
   }
 });
 
-app.put('/'expenses/:id', authenticateRequest, jsonParser, async (req, res) => {
+app.put('/api/expenses/:id', authenticateRequest, jsonParser, async (req, res) => {
   try {
     // Body is already parsed by jsonParser middleware
     const body = req.body;
@@ -3287,7 +3287,7 @@ app.put('/'expenses/:id', authenticateRequest, jsonParser, async (req, res) => {
   }
 });
 
-app.delete('/'expenses/:id', authenticateRequest, async (req, res) => {
+app.delete('/api/expenses/:id', authenticateRequest, async (req, res) => {
   try {
     const result = await query('DELETE FROM expenses WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -3302,7 +3302,7 @@ app.delete('/'expenses/:id', authenticateRequest, async (req, res) => {
 });
 
 // Download expense receipt
-app.get('/'expenses/:id/receipt', async (req, res) => {
+app.get('/api/expenses/:id/receipt', async (req, res) => {
       try {
         const result = await query('SELECT receipt_data, receipt_original_name, receipt_mimetype FROM expenses WHERE id = $1', [parseInt(req.params.id)]);
 
@@ -3322,7 +3322,7 @@ app.get('/'expenses/:id/receipt', async (req, res) => {
     });
 
     // Fuel API endpoints - fresh implementation
-    app.get('/'fuel', async (req, res) => {
+    app.get('/api/fuel', async (req, res) => {
       try {
         const page = parseInt(req.query.page) || 1;
         const limitParam = req.query.limit;
@@ -3449,7 +3449,7 @@ app.get('/'expenses/:id/receipt', async (req, res) => {
       }
     });
 
-    app.get('/'fuel/:id', async (req, res) => {
+    app.get('/api/fuel/:id', async (req, res) => {
       try {
         const result = await query('SELECT *, date::text as date FROM fuel WHERE id = $1', [parseInt(req.params.id)]);
         if (result.rows.length === 0) {
@@ -3480,7 +3480,7 @@ app.get('/'expenses/:id/receipt', async (req, res) => {
       }
     });
 
-    app.post('/'fuel', async (req, res) => {
+    app.post('/api/fuel', async (req, res) => {
       try {
         const body = req.body;
         console.log('POST /api/fuel received:', JSON.stringify(body, null, 2));
@@ -3569,7 +3569,7 @@ app.get('/'expenses/:id/receipt', async (req, res) => {
       }
     });
 
-    app.put('/'fuel/:id', async (req, res) => {
+    app.put('/api/fuel/:id', async (req, res) => {
       try {
         const body = req.body;
 
@@ -3662,7 +3662,7 @@ app.get('/'expenses/:id/receipt', async (req, res) => {
       }
     });
 
-    app.delete('/'fuel/:id', async (req, res) => {
+    app.delete('/api/fuel/:id', async (req, res) => {
       try {
         const result = await query('DELETE FROM fuel WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
         if (result.rows.length === 0) {
@@ -3678,7 +3678,7 @@ app.get('/'expenses/:id/receipt', async (req, res) => {
     });
 
     // Bulk fuel insert endpoint for efficient large imports
-    app.post('/'fuel/bulk', async (req, res) => {
+    app.post('/api/fuel/bulk', async (req, res) => {
       try {
         const body = req.body;
 
@@ -3875,7 +3875,7 @@ app.get('/'expenses/:id/receipt', async (req, res) => {
     // ============================================================================
 
 // Maintenance Schedules API endpoints
-app.get('/'maintenance/schedules', async (req, res) => {
+app.get('/api/maintenance/schedules', async (req, res) => {
   try {
     const { vehicle_id, status, category } = req.query;
     let queryStr = 'SELECT * FROM maintenance_schedules WHERE 1=1';
@@ -3910,7 +3910,7 @@ app.get('/'maintenance/schedules', async (req, res) => {
   }
 });
 
-app.get('/'maintenance/schedules/:id', async (req, res) => {
+app.get('/api/maintenance/schedules/:id', async (req, res) => {
   try {
     const result = await query('SELECT * FROM maintenance_schedules WHERE id = $1', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -3923,7 +3923,7 @@ app.get('/'maintenance/schedules/:id', async (req, res) => {
   }
 });
 
-app.post('/'maintenance/schedules', async (req, res) => {
+app.post('/api/maintenance/schedules', async (req, res) => {
   try {
     const body = req.body;
 
@@ -3975,7 +3975,7 @@ app.post('/'maintenance/schedules', async (req, res) => {
   }
 });
 
-app.put('/'maintenance/schedules/:id', async (req, res) => {
+app.put('/api/maintenance/schedules/:id', async (req, res) => {
   try {
     const body = req.body;
 
@@ -4023,7 +4023,7 @@ app.put('/'maintenance/schedules/:id', async (req, res) => {
   }
 });
 
-app.delete('/'maintenance/schedules/:id', async (req, res) => {
+app.delete('/api/maintenance/schedules/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM maintenance_schedules WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -4038,7 +4038,7 @@ app.delete('/'maintenance/schedules/:id', async (req, res) => {
 });
 
 // Vehicle Documents API endpoints
-app.get('/'maintenance/documents', async (req, res) => {
+app.get('/api/maintenance/documents', async (req, res) => {
   try {
     const { vehicle_id, document_type } = req.query;
     let queryStr = 'SELECT * FROM vehicle_documents WHERE 1=1';
@@ -4067,7 +4067,7 @@ app.get('/'maintenance/documents', async (req, res) => {
   }
 });
 
-app.get('/'maintenance/documents/:id', async (req, res) => {
+app.get('/api/maintenance/documents/:id', async (req, res) => {
   try {
     const result = await query('SELECT * FROM vehicle_documents WHERE id = $1', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -4080,7 +4080,7 @@ app.get('/'maintenance/documents/:id', async (req, res) => {
   }
 });
 
-app.post('/'maintenance/documents', async (req, res) => {
+app.post('/api/maintenance/documents', async (req, res) => {
   try {
     const body = req.body;
 
@@ -4111,7 +4111,7 @@ app.post('/'maintenance/documents', async (req, res) => {
   }
 });
 
-app.put('/'maintenance/documents/:id', async (req, res) => {
+app.put('/api/maintenance/documents/:id', async (req, res) => {
   try {
     const body = req.body;
 
@@ -4147,7 +4147,7 @@ app.put('/'maintenance/documents/:id', async (req, res) => {
   }
 });
 
-app.delete('/'maintenance/documents/:id', async (req, res) => {
+app.delete('/api/maintenance/documents/:id', async (req, res) => {
   try {
     const result = await query('DELETE FROM vehicle_documents WHERE id = $1 RETURNING *', [parseInt(req.params.id)]);
     if (result.rows.length === 0) {
@@ -4162,7 +4162,7 @@ app.delete('/'maintenance/documents/:id', async (req, res) => {
 });
 
 // Notification Preferences API endpoints
-app.get('/'maintenance/notifications/preferences', async (req, res) => {
+app.get('/api/maintenance/notifications/preferences', async (req, res) => {
   try {
     const result = await query('SELECT * FROM notification_preferences WHERE is_active = true ORDER BY created_at DESC');
     res.json(result.rows);
@@ -4172,7 +4172,7 @@ app.get('/'maintenance/notifications/preferences', async (req, res) => {
   }
 });
 
-app.post('/'maintenance/notifications/preferences', async (req, res) => {
+app.post('/api/maintenance/notifications/preferences', async (req, res) => {
   try {
     const body = req.body;
 
@@ -4198,7 +4198,7 @@ app.post('/'maintenance/notifications/preferences', async (req, res) => {
   }
 });
 
-app.put('/'maintenance/notifications/preferences/:id', async (req, res) => {
+app.put('/api/maintenance/notifications/preferences/:id', async (req, res) => {
   try {
     const body = req.body;
 
@@ -4230,7 +4230,7 @@ app.put('/'maintenance/notifications/preferences/:id', async (req, res) => {
 });
 
 // Notification History API endpoints
-app.get('/'maintenance/notifications/history', async (req, res) => {
+app.get('/api/maintenance/notifications/history', async (req, res) => {
   try {
     const { vehicle_id, status, limit = 50 } = req.query;
     let queryStr = 'SELECT * FROM notification_history WHERE 1=1';
@@ -4261,7 +4261,7 @@ app.get('/'maintenance/notifications/history', async (req, res) => {
 });
 
 // User Contacts API endpoints
-app.get('/'maintenance/contacts', async (req, res) => {
+app.get('/api/maintenance/contacts', async (req, res) => {
   try {
     const result = await query('SELECT * FROM user_contacts WHERE verified = true ORDER BY is_primary DESC, created_at DESC');
     res.json(result.rows);
@@ -4271,7 +4271,7 @@ app.get('/'maintenance/contacts', async (req, res) => {
   }
 });
 
-app.post('/'maintenance/contacts', async (req, res) => {
+app.post('/api/maintenance/contacts', async (req, res) => {
   try {
     const body = req.body;
 
@@ -4298,7 +4298,7 @@ app.post('/'maintenance/contacts', async (req, res) => {
   }
 });
 
-app.put('/'maintenance/contacts/:id', async (req, res) => {
+app.put('/api/maintenance/contacts/:id', async (req, res) => {
   try {
     const body = req.body;
 
@@ -4330,7 +4330,7 @@ app.put('/'maintenance/contacts/:id', async (req, res) => {
 });
 
 // Maintenance Dashboard API endpoint
-app.get('/'maintenance/dashboard', async (req, res) => {
+app.get('/api/maintenance/dashboard', async (req, res) => {
   try {
     // Get maintenance statistics
     const statsQuery = `
@@ -4389,7 +4389,7 @@ app.get('/'maintenance/dashboard', async (req, res) => {
 });
 
 // Test PDF generation and blob upload endpoint
-app.post('/'test/pdf', async (req, res) => {
+app.post('/api/test/pdf', async (req, res) => {
   try {
     console.log('🧪 Starting PDF generation test with blob upload');
 
@@ -4471,7 +4471,7 @@ app.post('/'test/pdf', async (req, res) => {
 });
 
 // Admin API endpoints
-app.get('/'admin/users', authenticateRequest, requireRoles('admin'), async (req, res) => {
+app.get('/api/admin/users', authenticateRequest, requireRoles('admin'), async (req, res) => {
   try {
     console.error('Starting GET /api/admin/users handler');
     console.error('About to execute database query for users');
@@ -4484,7 +4484,7 @@ app.get('/'admin/users', authenticateRequest, requireRoles('admin'), async (req,
   }
 });
 
-app.post('/'admin/users', jsonParser, authenticateRequest, requireRoles(['admin']), async (req, res) => {
+app.post('/api/admin/users', jsonParser, authenticateRequest, requireRoles(['admin']), async (req, res) => {
   const { email, password, role } = req.body || {};
   if (!email || !password || !role) {
     return res.status(400).json({ message: 'Email, password, and role are required.' });
@@ -4502,7 +4502,7 @@ app.post('/'admin/users', jsonParser, authenticateRequest, requireRoles(['admin'
   }
 });
 
-app.put('/'admin/users/:id', jsonParser, authenticateRequest, requireRoles(['admin']), async (req, res) => {
+app.put('/api/admin/users/:id', jsonParser, authenticateRequest, requireRoles(['admin']), async (req, res) => {
   console.log('Route hit for PUT /api/admin/users/:id');
   const { id } = req.params;
   const { email, role, password } = req.body || {};
@@ -4527,7 +4527,7 @@ app.put('/'admin/users/:id', jsonParser, authenticateRequest, requireRoles(['adm
   }
 });
 
-app.delete('/'admin/users/:id', authenticateRequest, requireRoles(['admin']), async (req, res) => {
+app.delete('/api/admin/users/:id', authenticateRequest, requireRoles(['admin']), async (req, res) => {
   const { id } = req.params;
 
   if (!id) {
