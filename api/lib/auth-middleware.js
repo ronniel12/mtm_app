@@ -15,6 +15,12 @@ async function authenticateRequest(req, res, next) {
     return next();
   }
 
+  // Exempt employee PIN-based routes from user authentication
+  const publicPaths = ['/api/employee/'];
+  if (publicPaths.some(path => req.path.startsWith(path))) {
+    return next();
+  }
+
   const token = getBearerToken(req);
   if (!token) {
     return res.status(401).json({ message: 'Authentication required' });
