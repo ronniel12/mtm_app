@@ -37,7 +37,7 @@ app.use((req, res, next) => {
 
 // Strip /api prefix for serverless compatibility
 app.use((req, res, next) => {
-  if (req.url.startsWith('/api')) {
+  while (req.url.startsWith('/api')) {
     req.url = req.url.replace('/api', '');
   }
   next();
