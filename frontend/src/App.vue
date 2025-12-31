@@ -180,6 +180,7 @@ const handleLogout = async () => {
 
       <!-- Logout Button -->
       <v-btn
+        v-if="adminAuth.isAuthenticated.value"
         icon
         @click="handleLogout"
         class="logout-btn"
@@ -307,6 +308,7 @@ const handleLogout = async () => {
         </v-list-item>
         <v-divider />
         <v-list-item
+          v-if="adminAuth.isAuthenticated.value"
           @click="handleLogout"
           class="drawer-item logout-item"
         >
