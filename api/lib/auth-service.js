@@ -28,8 +28,10 @@ async function hashPassword(password) {
   return bcrypt.hash(password, 12);
 }
 
-function verifyPassword(password, hash) {
-  return bcrypt.compare(password, hash);
+async function verifyPassword(password, hash) {
+  const isValid = await bcrypt.compare(password, hash);
+  console.error('Password verification result:', isValid ? 'valid' : 'invalid');
+  return isValid;
 }
 
 function generateAccessToken(user) {
@@ -122,7 +124,9 @@ async function revokeAllSessionsForUser(userId) {
 }
 
 async function getUserByEmail(email) {
+  console.error('Querying user by email:', email.toLowerCase());
   const { rows } = await query('SELECT id, email, password_hash, role, reset_token, reset_token_expires FROM users WHERE email = $1', [email.toLowerCase()]);
+  console.error('User query result:', rows.length ? 'found' : 'not found');
   return rows[0] || null;
 }
 
