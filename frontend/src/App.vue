@@ -89,6 +89,18 @@ const setActiveSectionMobile = (section) => {
   router.push('/' + section)
   mobileMenuOpen.value = false // Close mobile menu after selection
 }
+
+// Logout function
+const handleLogout = async () => {
+  try {
+    await adminAuth.logout()
+    router.push('/admin/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+    // Still redirect even if logout fails
+    router.push('/admin/login')
+  }
+}
 </script>
 
 <template>
@@ -163,6 +175,18 @@ const setActiveSectionMobile = (section) => {
           <span class="d-none d-md-inline">User Management</span>
         </v-tab>
       </v-tabs>
+
+      <v-spacer></v-spacer>
+
+      <!-- Logout Button -->
+      <v-btn
+        icon
+        @click="handleLogout"
+        class="logout-btn"
+        title="Logout"
+      >
+        <v-icon>mdi-logout</v-icon>
+      </v-btn>
 
       <!-- Logo and Text - Rightmost position -->
       <v-toolbar-title class="d-flex align-center toolbar-title">
@@ -280,6 +304,14 @@ const setActiveSectionMobile = (section) => {
         >
           <template #prepend><v-icon>mdi-account-group</v-icon></template>
           <v-list-item-title>User Management</v-list-item-title>
+        </v-list-item>
+        <v-divider />
+        <v-list-item
+          @click="handleLogout"
+          class="drawer-item logout-item"
+        >
+          <template #prepend><v-icon>mdi-logout</v-icon></template>
+          <v-list-item-title>Logout</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
@@ -420,6 +452,23 @@ html, body {
   font-size: 0.8rem !important;
   text-transform: none !important;
   letter-spacing: 0.5px !important;
+}
+
+.logout-btn {
+  margin-right: 16px;
+  color: white !important;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.logout-item {
+  color: #dc3545 !important;
+}
+
+.logout-item:hover {
+  background: #fef2f2 !important;
 }
 
 /* ==========================================================================
